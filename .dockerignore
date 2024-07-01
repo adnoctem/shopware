@@ -1,17 +1,6 @@
 /.idea
-
-###> shopware/core ###
-
-/public/bundles/*
-/public/media/*
-/public/theme/*
-/public/thumbnail/*
-/public/sitemap/*
-/files/*
-!/files/.htaccess
-/var/*
-!/var/.htaccess
-/auth.json
-/install.lock
-public/asset-manifest.json
-###< shopware/core ###
+/.github
+/docker
+/config/k8s
+/config/ssl
+.env.template
