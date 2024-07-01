@@ -3,7 +3,7 @@
 Some files have been created and/or updated to configure your new packages.
 Please review, edit and commit them: these files are yours.
 
-shopware/core  instructions:
+shopware/core instructions:
 
 * Setup your repository:
 
@@ -15,7 +15,7 @@ shopware/core  instructions:
 1. Adjust the .env file to your database
 2. Run ./bin/console system:install --basic-setup
 3. Optional: If you use Symfony CLI start the webserver symfony server:start -d
-3. The default credentials for administration are admin with password shopware
+4. The default credentials for administration are admin with password shopware
 
 * Run Shopware with Docker & Symfony CLI:
 
@@ -27,7 +27,7 @@ shopware/core  instructions:
 
 * Read the documentation at https://developer.shopware.com/
 
-symfony/messenger  instructions:
+symfony/messenger instructions:
 
 * You're ready to use the Messenger component. You can define your own message buses
   or start using the default one right now by injecting the message_bus service
@@ -41,7 +41,7 @@ symfony/messenger  instructions:
 
 * Read the documentation at https://symfony.com/doc/current/messenger.html
 
-symfony/mailer  instructions:
+symfony/mailer instructions:
 
 * You're ready to send emails.
 
