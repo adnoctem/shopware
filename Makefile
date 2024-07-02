@@ -67,9 +67,10 @@ EXECUTABLES := $(helmfile) $(kind) $(node) $(cfssl)
 PRINT_HELP ?=
 CHART ?=
 VALUES ?=
-RELEASE_NAME ?= $(shell printf "%s-%s" $(CHART_NAME) test)
-HELM_ARGS ?=
+
+REGISTRY ?= ghcr.io
 REGISTRY_USER ?=
+
 
 # ---------------------------
 # Custom functions
@@ -99,21 +100,6 @@ endef
 
 define log_attention
  $(call log, $(1), "red")
-endef
-
-# Kustomization for TLS certificates generated with cfssl with 'secrets' target
-define kustomization
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-secretGenerator:
-  - name: root-ca
-    type: "kubernetes.io/tls"
-    namespace: cert-manager
-    files:
-      - tls.crt=ca.pem
-      - tls.key=ca-key.pem
-    options:
-      disableNameSuffixHash: true
 endef
 
 # ---------------------------
@@ -152,7 +138,13 @@ compose:
 	$(call log_success, "Starting Docker Compose")
 	@docker compose up -f $(DOCKER_DIR)/compose.yaml -d
 
-
+.PHONY: registry-login
+registry-login:
+ifndef REGISTRY_USER
+	$(call log_attention, "Cannot login to $(REGISTRY) registry using empty username! REGISTRY_USER must be defined")
+else
+	gh auth token | docker login $(REGISTRY) -u $(REGISTRY_USER) --password-stdin
+endif
 
 # ---------------------------
 # Linting

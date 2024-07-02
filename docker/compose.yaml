@@ -2,20 +2,37 @@ version: '3'
 
 services:
 
+  shopware:
+    image: local
+    build:
+      context: ..
+      dockerfile: Dockerfile.nginx
+    env_file: ../.app.env
+    ports:
+      - "8000"
+    volumes:
+      - files:/var/www/html/files
+      - theme:/var/www/html/public/theme
+      - media:/var/www/html/public/media
+      - thumbnail:/var/www/html/public/thumbnail
+      - sitemap:/var/www/html/public/sitemap
+    networks:
+      - web
+      - internal
+
   database:
     image: mysql:${MYSQL_VERSION:-8}-oracle
     ports:
       - "3306"
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-shopware}
-      # You should definitely change the password in production
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-!ChangeMe!}
       MYSQL_USER: ${MYSQL_USER:-shopware}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-!ChangeMe!}
     volumes:
       - db-data:/var/lib/mysql:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/mysql:rw
+    networks:
+      - internal
 
   opensearch:
     image: opensearchproject/opensearch:2
@@ -26,6 +43,8 @@ services:
     environment:
       discovery.type: single-node
       plugins.security.disabled: 'true'
+    networks:
+      - internal
 
   mailer:
     image: axllent/mailpit
@@ -35,9 +54,13 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
-
+    networks:
+      - internal
 
 volumes:
   db-data:
   opensearch-data:
 
+networks:
+  web:
+  internal:

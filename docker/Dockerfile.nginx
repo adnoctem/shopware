@@ -1,0 +1,50 @@
+#syntax=docker/dockerfile:1.4
+
+# select a valid PHP version
+ARG PHP_VERSION=8.2
+
+# pin versions
+FROM php:$PHP_VERSION-fpm-alpine as base
+FROM ghcr.io/friendsofshopware/shopware-cli:latest-php-$PHP_VERSION as shopware-cli
+
+# OpenContainers Annotations
+# ref: https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.title="Shopware 6"
+LABEL org.opencontainers.image.description="Shopware 6 is an open source headless commerce platform powered by Symfony 7 and Vue.js 3."
+LABEL org.opencontainers.image.authors="info@fmj.studio"
+LABEL org.opencontainers.image.url="ghcr.io/fmjstudios/shopware"
+LABEL org.opencontainers.image.documentation="https://github.com/fmjstudios/shopware/wiki"
+LABEL org.opencontainers.image.source="https://github.com/fmjstudios/shopware"
+
+FROM base as build
+
+# install `install-php-extensions` to install extensions (and composer) with all dependencies included
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+# install shopware-cli
+COPY --from=shopware-cli /usr/local/bin/shopware-cli /usr/local/bin
+
+# install Shopware 6 required PHP extensions and the latest version of Composer
+# ref: https://github.com/mlocati/docker-php-extension-installer
+# ref: https://developer.shopware.com/docs/guides/installation/requirements.html
+RUN install-php-extensions gd intl xdebug pdo pdo_mysql zip zlib @composer
+
+# install system dependencies
+RUN apk add --no-cache nginx supervisor
+
+
+
+
+#COPY --link . /app
+#WORKDIR /app
+#
+#RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
+#    --mount=type=cache,target=/root/.composer \
+#    --mount=type=cache,target=/root/.npm \
+#    /usr/local/bin/entrypoint.sh shopware-cli project ci /app
+#
+#FROM base as final
+#
+#COPY --from=build --chown=www-data /app /var/www/html
+#
+#EXPOSE 8000
