@@ -32,8 +32,8 @@ RUN install-php-extensions gd intl xdebug pdo pdo_mysql zip zlib @composer
 # install system dependencies
 RUN apk add --no-cache nginx supervisor
 
-
-
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["run"]
 
 #COPY --link . /app
 #WORKDIR /app
