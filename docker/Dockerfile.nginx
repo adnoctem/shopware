@@ -27,13 +27,24 @@ COPY --from=shopware-cli /usr/local/bin/shopware-cli /usr/local/bin
 # install Shopware 6 required PHP extensions and the latest version of Composer
 # ref: https://github.com/mlocati/docker-php-extension-installer
 # ref: https://developer.shopware.com/docs/guides/installation/requirements.html
-RUN install-php-extensions gd intl xdebug pdo pdo_mysql zip zlib @composer
+RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp soap zip zlib ffi redis opcache apcu amqp @composer
 
 # install system dependencies
-RUN apk add --no-cache nginx supervisor
+RUN apk add --no-cache nginx supervisor jq trurl
+
+# remove default configuration files & create default project locations
+RUN <<EOF
+rm -rf /usr/local/etc/php-fpm.d/*
+rm -rf /usr/local/etc/php-fpm.conf*
+rm -rf /usr/local/etc/php/php.ini*
+mkdir -p /var/www/html
+
+EOF
+
+
+
 
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["run"]
 
 #COPY --link . /app
 #WORKDIR /app

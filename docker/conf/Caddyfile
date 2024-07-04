@@ -1,4 +1,4 @@
-{$HOSTNAME} {
+{$HOSTNAME:localhost} {
   header {
     X-Frame-Options DENY
     Referrer-Policy no-referrer-when-downgrade
