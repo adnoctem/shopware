@@ -6,4 +6,4 @@ export PGID="${PGID:-1001}"
 
 chown -R "${PUID}:${PGID}" .
 
-fmjctl run
+swctl run

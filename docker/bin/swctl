@@ -1,0 +1,99 @@
+#!/usr/bin/env sh
+#
+# 'swctl' is a POSIX shell script meant to automate certain parts of the Shopware deployment tasks
+
+# shellcheck disable=SC3040
+set -o errexit -o nounset -o pipefail
+
+# shellcheck source=../lib/utils.sh
+. /var/lib/utils.sh
+
+COMPLETED_DATE=$(date '+%Y-%m-%dT%H:%M:%S+00.00')
+
+# ----------------------
+#   'help' usage function
+# ----------------------
+ctl_usage() {
+  echo
+  echo "Usage: $(basename "${0}") <COMMAND>"
+  echo
+  echo "init    - Initialize the Shopware 6 instance"
+  echo "start   - Start the supervisord process"
+  echo "run     - Run Shopware 6 (init & start)"
+  echo "help    - Print this usage information"
+  echo
+}
+
+# ----------------------
+#   'init' function
+# ----------------------
+ctl_init() {
+  is_installed=$(pc system:is-installed)
+
+  if [ ! "${is_installed}" ]; then
+    log "INFO: Installing Shopware 6 from scratch..."
+    pc system:install --create-database "--shop-locale=${INSTALL_LOCALE}" "--shop-currency=${INSTALL_CURRENCY}" --force
+    pc user:create "${INSTALL_ADMIN_USERNAME}" --admin --password="${INSTALL_ADMIN_PASSWORD}" -n
+    pc sales-channel:create:storefront --name=Storefront --url="${APP_URL}"
+    pc theme:change --all Storefront
+    pc system:config:set core.frw.completedAt "${COMPLETED_DATE}"
+    pc plugin:refresh
+
+    shopware_install_extensions
+  else
+    log "INFO: Running Shopware 6 shop..."
+    if [ "${SHOPWARE_SKIP_ASSET_COPY-""}" ]; then
+      pc system:update:finish --skip-asset-build
+    else
+      pc system:update:finish
+    fi
+
+    if [ "${SHOPWARE_SKIP_ASSET_COPY-""}" ]; then
+      pc plugin:update:all
+    else
+      pc plugin:update:all --skip-asset-build
+    fi
+
+    shopware_install_extensions
+  fi
+}
+
+# ----------------------
+#   'start' function
+# ----------------------
+ctl_start() {
+  /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+}
+
+# --------------------------------
+#   MAIN
+# --------------------------------
+main() {
+  cmd=${1}
+
+  case "${cmd}" in
+  init)
+    ctl_init
+    return $?
+    ;;
+  start)
+    ctl_start
+    return $?
+    ;;
+  run)
+    ctl_init
+    ctl_start
+    return $?
+    ;;
+  *)
+    log::red "Unknown command: ${cmd}. See 'help' command for usage information:"
+    hosts::usage
+    return 1
+    ;;
+  esac
+}
+
+# ------------
+# 'main' call
+# ------------
+main "$@"

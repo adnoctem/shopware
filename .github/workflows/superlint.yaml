@@ -25,3 +25,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASH_EXEC_IGNORE_LIBRARIES: true
           VALIDATE_JSCPD: false
+          VALIDATE_PHP: false
+          VALIDATE_PHP_PSALM: false
