@@ -1,9 +1,13 @@
 #!/usr/bin/env sh
 
 # Get the PUID and PGID from environment variables (or use default values 1000 if not set)
-export PUID="${PUID:-1001}"
-export PGID="${PGID:-1001}"
+puid="${PUID:-1001}"
+pgid="${PGID:-1001}"
 
-chown -R "${PUID}:${PGID}" .
+# regenerate the nginx configuration of environment variables have changed from defaults
+envsubst < /usr/local/etc/nginx/templates/nginx.conf.template > /usr/local/etc/nginx/nginx.conf
+
+# (re-) own all files
+chown -R "${puid}:${pgid}" .
 
 swctl run

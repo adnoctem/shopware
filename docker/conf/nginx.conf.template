@@ -1,8 +1,8 @@
 server {
-    listen 8000;
+    listen 127.0.0.1:${PORT};
 
     index index.php index.html;
-    server_name localhost;
+    server_name ${HOSTNAME};
 
     client_max_body_size 32M;
 
@@ -24,7 +24,7 @@ server {
         proxy_read_timeout 300s;
         send_timeout 300s;
         client_body_buffer_size 128k;
-        fastcgi_pass unix://var/run/php/php-fpm.sock;
+        fastcgi_pass unix://run/php/php-fpm.sock;
     }
 
     location = /sitemap.xml {

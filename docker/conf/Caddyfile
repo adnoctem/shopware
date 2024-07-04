@@ -1,4 +1,4 @@
-{$HOSTNAME:localhost} {
+{$HOSTNAME:localhost}:${PORT:8080} {
   header {
     X-Frame-Options DENY
     Referrer-Policy no-referrer-when-downgrade
@@ -16,7 +16,7 @@
   }
 
   root * public
-  php_fastcgi ${CADDY_FPM_LISTEN:unix//var/run/php/php-fpm.sock}
+  php_fastcgi ${CADDY_FPM_LISTEN:unix//run/php/php-fpm.sock}
   encode zstd gzip
   file_server
 }

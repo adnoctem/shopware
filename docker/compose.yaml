@@ -1,52 +1,64 @@
-version: '3'
 
 services:
-
   shopware:
-    image: local
+    image: fmjstudios/shopware:latest
     build:
       context: ..
-      dockerfile: Dockerfile.nginx
+      dockerfile: Dockerfile
     env_file: ../.app.env
     ports:
-      - "8000"
+      - "8080:8080"
     volumes:
-      - files:/var/www/html/files
-      - theme:/var/www/html/public/theme
-      - media:/var/www/html/public/media
-      - thumbnail:/var/www/html/public/thumbnail
-      - sitemap:/var/www/html/public/sitemap
+      - sw-files:/var/www/html/files
+      - sw-theme:/var/www/html/public/theme
+      - sw-media:/var/www/html/public/media
+      - sw-thumbnail:/var/www/html/public/thumbnail
+      - sw-sitemap:/var/www/html/public/sitemap
     networks:
       - web
       - internal
+    depends_on:
+      mysql:
+        condition: service_started
+      opensearch:
+        condition: service_started
+      mailpit:
+        condition: service_started
 
-  database:
+  mysql:
     image: mysql:${MYSQL_VERSION:-8}-oracle
     ports:
       - "3306"
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-shopware}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-!ChangeMe!}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-shopware}
       MYSQL_USER: ${MYSQL_USER:-shopware}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-!ChangeMe!}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1", "-uroot", "-pshopware"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   opensearch:
     image: opensearchproject/opensearch:2
     ports:
       - "9200"
+      - "9600"
+    environment:
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: AShopware6Password!
+      discovery.type: single-node
+      plugins.security.disabled: true
     volumes:
       - opensearch-data:/usr/share/opensearch/data
-    environment:
-      discovery.type: single-node
-      plugins.security.disabled: 'true'
     networks:
       - internal
 
-  mailer:
+  mailpit:
     image: axllent/mailpit
     ports:
       - "1025"
@@ -58,8 +70,14 @@ services:
       - internal
 
 volumes:
+  sw-files:
+  sw-theme:
+  sw-media:
+  sw-thumbnail:
+  sw-sitemap:
   db-data:
   opensearch-data:
+
 
 networks:
   web:

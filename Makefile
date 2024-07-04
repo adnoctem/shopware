@@ -120,6 +120,22 @@ env: compose
 endif
 
 # ---------------------------
+#   Shopware Targets
+# ---------------------------
+
+define IMAGE_INFO
+# Build a Docker image.
+endef
+.PHONY: image
+ifeq ($(PRINT_HELP), y)
+image:
+	echo "$$IMAGE_INFO"
+else
+image:
+	docker buildx build -f docker/Dockerfile -t fmjstudios/shopware .
+endif
+
+# ---------------------------
 #   Dependencies
 # ---------------------------
 
@@ -136,7 +152,7 @@ secrets-dir:
 .PHONY: compose
 compose:
 	$(call log_success, "Starting Docker Compose")
-	@docker compose up -f $(DOCKER_DIR)/compose.yaml -d
+	@docker compose -f $(DOCKER_DIR)/compose.yaml up -d
 
 .PHONY: registry-login
 registry-login:

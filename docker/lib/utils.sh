@@ -15,8 +15,8 @@ database_connection_check() {
   echo "|--------------------------------------------------------------|"
 
   # shellcheck disable=SC2086
-  database_host=${DATABASE_HOST:-""}
-  database_port="${DATABASE_PORT:-}"
+	database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
+	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
   tries=0
 
   until nc -z -w$(( "$DATABASE_TIMEOUT" + 20 )) -v "$database_host" "${database_port:-3306}"

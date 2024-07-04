@@ -1,6 +1,7 @@
 /.idea
 /.github
-/docker
+/docker/Dockerfile
+/docker/compose.yaml
 /config/k8s
 /config/ssl
 .env.template

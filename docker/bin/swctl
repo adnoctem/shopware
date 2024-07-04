@@ -6,7 +6,7 @@
 set -o errexit -o nounset -o pipefail
 
 # shellcheck source=../lib/utils.sh
-. /var/lib/utils.sh
+. /usr/local/lib/utils.sh
 
 COMPLETED_DATE=$(date '+%Y-%m-%dT%H:%M:%S+00.00')
 
@@ -62,7 +62,7 @@ ctl_init() {
 #   'start' function
 # ----------------------
 ctl_start() {
-  /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+  /usr/bin/supervisord -c /usr/local/etc/supervisor/supervisord.conf
 }
 
 # --------------------------------
