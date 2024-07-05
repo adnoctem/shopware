@@ -19,7 +19,7 @@ database_connection_check() {
 	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
   tries=0
 
-  until nc -z -w$(( "$DATABASE_TIMEOUT" + 20 )) -v "$database_host" "${database_port:-3306}"
+  until nc -z -w$(( DATABASE_TIMEOUT + 20 )) -v "$database_host" "${database_port:-3306}"
   do
     log "Waiting ${DATABASE_TIMEOUT:-120} seconds for database connection to become available"
     sleep 1
