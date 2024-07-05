@@ -28,19 +28,9 @@ ctl_usage() {
 #   'init' function
 # ----------------------
 ctl_init() {
-  is_installed=$(pc system:is-installed)
+  database_connection_check
 
-  if [ ! "${is_installed}" ]; then
-    log "INFO: Installing Shopware 6 from scratch..."
-    pc system:install --create-database "--shop-locale=${INSTALL_LOCALE}" "--shop-currency=${INSTALL_CURRENCY}" --force
-    pc user:create "${INSTALL_ADMIN_USERNAME}" --admin --password="${INSTALL_ADMIN_PASSWORD}" -n
-    pc sales-channel:create:storefront --name=Storefront --url="${APP_URL}"
-    pc theme:change --all Storefront
-    pc system:config:set core.frw.completedAt "${COMPLETED_DATE}"
-    pc plugin:refresh
-
-    shopware_install_extensions
-  else
+  if pc system:is-installed; then
     log "INFO: Running Shopware 6 shop..."
     if [ "${SHOPWARE_SKIP_ASSET_COPY-""}" ]; then
       pc system:update:finish --skip-asset-build
@@ -53,6 +43,16 @@ ctl_init() {
     else
       pc plugin:update:all --skip-asset-build
     fi
+
+    shopware_install_extensions
+  else
+    log "INFO: Installing Shopware 6 from scratch..."
+    pc system:install --create-database "--shop-locale=${INSTALL_LOCALE}" "--shop-currency=${INSTALL_CURRENCY}" --force
+    pc user:create "${INSTALL_ADMIN_USERNAME}" --admin --password="${INSTALL_ADMIN_PASSWORD}" -n
+    pc sales-channel:create:storefront --name=Storefront --url="${APP_URL}"
+    pc theme:change --all Storefront
+    pc system:config:set core.frw.completedAt "${COMPLETED_DATE}"
+    pc plugin:refresh
 
     shopware_install_extensions
   fi

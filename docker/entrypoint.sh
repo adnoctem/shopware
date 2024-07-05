@@ -8,6 +8,6 @@ pgid="${PGID:-1001}"
 envsubst < /usr/local/etc/nginx/templates/nginx.conf.template > /usr/local/etc/nginx/nginx.conf
 
 # (re-) own all files
-chown -R "${puid}:${pgid}" .
+#chown -R "${puid}:${pgid}" .
 
 swctl run
