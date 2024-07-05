@@ -5,3 +5,4 @@
 /config/k8s
 /config/ssl
 .env.template
+Makefile

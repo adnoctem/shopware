@@ -2,18 +2,23 @@
 services:
   shopware:
     image: fmjstudios/shopware:latest
+    labels:
+      app: shopware
     build:
       context: ..
       dockerfile: Dockerfile
     env_file: ../.app.env
     ports:
       - "8080:8080"
+    environment:
+      DATABASE_TIMEOUT: 360
+      PHP_DISPLAY_ERRORS: On
     volumes:
-      - sw-files:/var/www/html/files
-      - sw-theme:/var/www/html/public/theme
-      - sw-media:/var/www/html/public/media
-      - sw-thumbnail:/var/www/html/public/thumbnail
-      - sw-sitemap:/var/www/html/public/sitemap
+      - sw-files:/var/www/html/files:rw
+      - sw-theme:/var/www/html/public/theme:rw
+      - sw-media:/var/www/html/public/media:rw
+      - sw-thumbnail:/var/www/html/public/thumbnail:rw
+      - sw-sitemap:/var/www/html/public/sitemap:rw
     networks:
       - web
       - internal
@@ -27,6 +32,9 @@ services:
 
   mysql:
     image: mysql:${MYSQL_VERSION:-8}-oracle
+    labels:
+      app: mysql
+    restart: always
     ports:
       - "3306"
     environment:
@@ -46,6 +54,8 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2
+    labels:
+      app: opensearch
     ports:
       - "9200"
       - "9600"
@@ -60,9 +70,11 @@ services:
 
   mailpit:
     image: axllent/mailpit
+    labels:
+      app: mailpit
     ports:
       - "1025"
-      - "8025"
+      - "8025:8025"
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1

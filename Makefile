@@ -52,6 +52,7 @@ DOCS_DIR := $(ROOT_DIR)/docs
 MARKDOWNLINT_CONFIG := $(CI_DIR)/linters/.markdown-lint.yml
 
 DATE := $(shell date '+%d.%m.%y-%T')
+SHOPWARE_CONTAINER_ID := $(shell docker ps -aq -f 'label=app=shopware')
 
 # Executables
 helmfile := helmfile
@@ -119,6 +120,20 @@ else
 env: compose
 endif
 
+define ENV_INFO
+# Create a local development environment for Helm charts. This is a wrapper
+# target which requires the 'dev-cluster' and 'dev-cluster-bootstrap' Make
+# targets.
+endef
+.PHONY: prune
+ifeq ($(PRINT_HELP), y)
+prune:
+	echo "$$ENV_INFO"
+else
+prune:
+	@docker compose -f $(DOCKER_DIR)/compose.yaml down -v
+endif
+
 # ---------------------------
 #   Shopware Targets
 # ---------------------------
@@ -153,6 +168,8 @@ secrets-dir:
 compose:
 	$(call log_success, "Starting Docker Compose")
 	@docker compose -f $(DOCKER_DIR)/compose.yaml up -d
+	@sleep 5
+	@docker logs -f $(SHOPWARE_CONTAINER_ID)
 
 .PHONY: registry-login
 registry-login:

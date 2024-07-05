@@ -6,13 +6,6 @@ ARG PHP_VERSION=8.2
 # pin versions
 FROM php:$PHP_VERSION-fpm-alpine as base
 
-# container settings
-ARG PHP_VERSION=8.2
-ARG PUID=1001
-ARG PGID=1001
-ARG PORT=8080
-ARG HOSTNAME=localhost
-
 # OpenContainers Annotations
 # ref: https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.title="Shopware 6"
@@ -24,14 +17,20 @@ LABEL org.opencontainers.image.source="https://github.com/fmjstudios/shopware"
 
 FROM base as init
 
+# container settings
+ARG PHP_VERSION
+ARG PUID=1001
+ARG PGID=1001
+ARG PORT=8080
+ARG HOSTNAME=localhost
+
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
-
 
 # install Shopware 6 required PHP extensions and the latest version of Composer
 # ref: https://github.com/mlocati/docker-php-extension-installer
 # ref: https://developer.shopware.com/docs/guides/installation/requirements.html
-RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp soap zip zlib ffi redis opcache apcu amqp sodium @composer
+RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp soap ffi redis opcache apcu amqp sodium @composer
 
 # install system dependencies
 RUN apk add --no-cache nginx supervisor jq trurl envsubst
@@ -80,8 +79,8 @@ ENV PUID=$PUID \
 
 # crate user and group
 RUN <<EOF
-addgroup --system --gid ${PUID} shopware
-adduser --system --uid ${PGID} shopware
+adduser --system --uid ${PUID} shopware
+addgroup --system --gid ${PGID} shopware
 EOF
 
 # remove default configuration files & create default configuration locations
@@ -92,26 +91,23 @@ rm -rf /usr/local/etc/php/php.ini*
 mkdir -p /var/www/html
 mkdir -p /usr/local/etc/nginx/templates
 mkdir -p /usr/local/etc/supervisor
+mkdir -p /run/php
 EOF
 
 # config files
-COPY --chown=${PUID}:${PGID} docker/conf/php.ini /usr/local/etc/php
-COPY --chown=${PUID}:${PGID} docker/conf/docker-php.ini /usr/local/etc/php/conf.d
-COPY --chown=${PUID}:${PGID} docker/conf/php-fpm.conf /usr/local/etc
-COPY --chown=${PUID}:${PGID} docker/conf/www.conf /usr/local/etc/php-fpm.d
-COPY --chown=${PUID}:${PGID} docker/conf/supervisor.conf /usr/local/etc/supervisor
-COPY --chown=${PUID}:${PGID} docker/conf/nginx.conf.template /usr/local/etc/nginx/templates/nginx.conf.template
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/php.ini /usr/local/etc/php
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/docker-php.ini /usr/local/etc/php/conf.d
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/php-fpm.conf /usr/local/etc
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/www.conf /usr/local/etc/php-fpm.d
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/supervisord.conf /usr/local/etc/supervisor
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/nginx.conf.template /usr/local/etc/nginx/templates/nginx.conf.template
+COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/fastcgi.conf /usr/local/etc/nginx/fastcgi.conf
+COPY --from=nginx:latest /etc/nginx/mime.types /usr/local/etc/nginx
 
 # executables & libs
 COPY --chown=${PUID}:${PGID} --chmod=755 docker/bin/swctl /usr/local/bin
 COPY --chown=${PUID}:${PGID} --chmod=755 docker/lib/utils.sh /usr/local/lib
 COPY --chown=0:0 --chmod=755 docker/entrypoint.sh /usr/sbin
-
-# produce a valid first Nginx config & own files
-RUN <<EOF
-envsubst < /usr/local/etc/nginx/templates/nginx.conf.template > /usr/local/etc/nginx/nginx.conf
-chown -R ${PUID}:${PGID} /var/www/html /usr/local/lib /usr/local/etc
-EOF
 
 # set Shopware environment variables
 ENV APP_ENV=prod \
@@ -128,7 +124,6 @@ ENV APP_ENV=prod \
     SHOPWARE_ES_INDEXING_ENABLED=0 \
     SHOPWARE_ES_INDEX_PREFIX="sw" \
     SHOPWARE_ES_THROW_EXCEPTION="1" \
-    MESSENGER_TRANSPORT_DSN="" \
     STOREFRONT_PROXY_URL="http://localhost" \
     SHOPWARE_HTTP_CACHE_ENABLED=1 \
     SHOPWARE_HTTP_DEFAULT_TTL=7200 \
@@ -153,9 +148,21 @@ RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
 
 FROM init as final
 
-COPY --from=build --chown=${PUID}:${PGID} /app /var/www/html
+ARG PUID
+ARG PGID
+
+COPY --from=build --chown=$PUID:$PGID --chmod=755 /app /var/www/html
+
+VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
+
+# produce a valid first Nginx config & own files
+RUN chown -R $PUID:$PGID /var/www/html && \
+    chown -R $PUID:$PGID /usr/local/lib && \
+    chown -R $PUID:$PGID /usr/local/etc
+
 WORKDIR /var/www/html
-USER ${PUID}
-EXPOSE ${PORT}
+
+#USER $PUID
+EXPOSE $PORT
 
 ENTRYPOINT ["/usr/sbin/entrypoint.sh"]

@@ -5,9 +5,14 @@ puid="${PUID:-1001}"
 pgid="${PGID:-1001}"
 
 # regenerate the nginx configuration of environment variables have changed from defaults
-envsubst < /usr/local/etc/nginx/templates/nginx.conf.template > /usr/local/etc/nginx/nginx.conf
+# shellcheck disable=SC2016
+envsubst '\$PORT \$HOSTNAME' < /usr/local/etc/nginx/templates/nginx.conf.template > /usr/local/etc/nginx/nginx.conf
 
 # (re-) own all files
-#chown -R "${puid}:${pgid}" .
+chown -R "${puid}:${pgid}" .
+chown -R "${puid}:${pgid}" /usr/local/lib
+chown -R "${puid}:${pgid}" /usr/local/etc
+
+su "${puid}"
 
 swctl run

@@ -1,67 +1,136 @@
-server {
-    listen 127.0.0.1:${PORT};
+daemon              off;
+user                shopware;
+worker_processes    4;
 
-    index index.php index.html;
-    server_name ${HOSTNAME};
+error_log  /dev/stderr  debug;
 
-    client_max_body_size 32M;
+events {
+    worker_connections   1024;
+    use                  epoll;
+}
 
-    root /var/www/html/public;
+http {
+    include       /usr/local/etc/nginx/mime.types;
+    default_type  application/octet-stream;
 
-    location /recovery/update/ {
-        index index.php;
-        try_files $uri /recovery/install/index.php$is_args$args;
+
+    log_format  main    '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        '"$gzip_ratio"';
+
+    log_format download  '$remote_addr - $remote_user [$time_local] '
+                         '"$request" $status $bytes_sent '
+                         '"$http_referer" "$http_user_agent" '
+                         '"$http_range" "$sent_http_content_range"';
+
+    access_log /dev/stderr main;
+    server_tokens off;
+    charset utf-8;
+#     client_header_timeout  3m;
+#     client_body_timeout    3m;
+#     send_timeout           3m;
+#
+#     client_header_buffer_size    1k;
+#     large_client_header_buffers  4 4k;
+#
+#     gzip on;
+#     gzip_min_length  1100;
+#     gzip_buffers     4 8k;
+#     gzip_types       text/plain;
+#
+#     output_buffers   1 32k;
+#     postpone_output  1460;
+#
+#     sendfile         on;
+#     tcp_nopush       on;
+#     tcp_nodelay      on;
+#
+#     keepalive_timeout  75 20;
+
+    #lingering_time     30;
+    #lingering_timeout  10;
+    #reset_timedout_connection  on;
+    upstream php-fpm {
+        server unix:/run/php/php-fpm.sock;
     }
 
-    location ~ ^/(recovery\/update\/index|index|shopware-installer\.phar)\.php(/|$) {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        include fastcgi.conf;
-        fastcgi_param HTTP_PROXY "";
-        fastcgi_buffers 8 16k;
-        fastcgi_buffer_size 32k;
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 300s;
-        proxy_read_timeout 300s;
-        send_timeout 300s;
-        client_body_buffer_size 128k;
-        fastcgi_pass unix://run/php/php-fpm.sock;
-    }
+    server {
+            listen $PORT;
+            listen [::]:$PORT;
+            server_name $HOSTNAME;
 
-    location = /sitemap.xml {
-        log_not_found off;
-        access_log off;
-        try_files $uri /;
-    }
+            index index.php index.html;
+            root /var/www/html/public;
 
-    location = /robots.txt {
-        log_not_found off;
-        access_log off;
-        try_files $uri /;
-    }
+            client_max_body_size 128M;
 
-    location ~* ^.+\.(?:css|cur|js|jpe?g|gif|ico|png|svg|webp|avif|html|woff|woff2|xml)$ {
-        expires 1y;
-        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+            location /recovery/install {
+                index index.php;
+                try_files $uri /recovery/install/index.php$is_args$args;
+            }
+#
+            location /recovery/update/assets {
+                location /recovery/update/assets {
+                }
+                if (!-e $request_filename) {
+                    rewrite . /recovery/update/index.php last;
+                }
+            }
 
-        access_log off;
+            location = /sitemap.xml {
+                log_not_found off;
+                access_log off;
+                try_files $uri /;
+            }
 
-        # The directive enables or disables messages in error_log about files not found on disk.
-        log_not_found off;
+            location = /robots.txt {
+                log_not_found off;
+                access_log off;
+                try_files $uri /;
+            }
 
-        tcp_nodelay off;
+            location ~* ^.+\.(?:css|cur|js|jpe?g|gif|ico|png|svg|webp|html|woff|woff2|xml)$ {
+                expires 1y;
+                add_header Cache-Control "public, must-revalidate, proxy-revalidate";
 
-        ## Set the OS file cache.
-        open_file_cache max=3000 inactive=120s;
-        open_file_cache_valid 45s;
-        open_file_cache_min_uses 2;
-        open_file_cache_errors off;
+                access_log off;
 
-        location ~* ^.+\.svg$ {
-            add_header Content-Security-Policy "script-src 'none'";
-        }
-    }
+                # The directive enables or disables messages in error_log about files not found on disk.
+                log_not_found off;
 
-    location / {
-        try_files $uri /index.php$is_args$args;
+                tcp_nodelay off;
+
+                ## Set the OS file cache.
+                open_file_cache max=3000 inactive=120s;
+                open_file_cache_valid 45s;
+                open_file_cache_min_uses 2;
+                open_file_cache_errors off;
+
+                try_files $uri /index.php$is_args$args;
+            }
+
+            location ~* ^.+\.svg$ {
+                add_header Content-Security-Policy "script-src 'none'";
+            }
+
+            location / {
+                try_files $uri /index.php$is_args$args;
+            }
+
+            location ~ \.php$ {
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                include fastcgi.conf;
+                # fastcgi_param HTTP_PROXY "localhost:8080";
+                fastcgi_buffers 8 16k;
+                fastcgi_buffer_size 32k;
+                proxy_connect_timeout 300s;
+                proxy_send_timeout 300s;
+                proxy_read_timeout 300s;
+                send_timeout 300s;
+                client_body_buffer_size 128k;
+                fastcgi_pass php-fpm;
+                http2_push_preload on;
+            }
     }
 }

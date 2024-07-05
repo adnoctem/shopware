@@ -86,7 +86,7 @@ main() {
     return $?
     ;;
   *)
-    log::red "Unknown command: ${cmd}. See 'help' command for usage information:"
+    log "Unknown command: ${cmd}. See 'help' command for usage information:"
     hosts::usage
     return 1
     ;;

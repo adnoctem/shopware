@@ -21,7 +21,7 @@ database_connection_check() {
 
   until nc -z -w$(( DATABASE_TIMEOUT + 20 )) -v "$database_host" "${database_port:-3306}"
   do
-    log "Waiting ${DATABASE_TIMEOUT:-120} seconds for database connection to become available"
+    log "Waiting $(( DATABASE_TIMEOUT - tries )) more seconds for database connection to become available"
     sleep 1
     tries=$(( tries + 1 ))
 
