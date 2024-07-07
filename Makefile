@@ -52,7 +52,6 @@ DOCS_DIR := $(ROOT_DIR)/docs
 MARKDOWNLINT_CONFIG := $(CI_DIR)/linters/.markdown-lint.yml
 
 DATE := $(shell date '+%d.%m.%y-%T')
-SHOPWARE_CONTAINER_ID := $(shell docker ps -aq -f 'label=app=shopware')
 
 # Executables
 helmfile := helmfile
@@ -117,7 +116,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose
+env: compose logs
 endif
 
 define ENV_INFO
@@ -167,9 +166,13 @@ secrets-dir:
 .PHONY: compose
 compose:
 	$(call log_success, "Starting Docker Compose")
-	@docker compose -f $(DOCKER_DIR)/compose.yaml up -d
+	@docker compose -f compose.yaml up -d
 	@sleep 5
-	@docker logs -f $(SHOPWARE_CONTAINER_ID)
+
+
+.PHONY: logs
+logs:
+	@docker logs -f $(shell docker ps -aq -f 'label=app=shopware')
 
 .PHONY: registry-login
 registry-login:

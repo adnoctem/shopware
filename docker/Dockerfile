@@ -22,7 +22,6 @@ ARG PHP_VERSION
 ARG PUID=1001
 ARG PGID=1001
 ARG PORT=8080
-ARG HOSTNAME=localhost
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
@@ -30,7 +29,7 @@ COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr
 # install Shopware 6 required PHP extensions and the latest version of Composer
 # ref: https://github.com/mlocati/docker-php-extension-installer
 # ref: https://developer.shopware.com/docs/guides/installation/requirements.html
-RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp soap ffi redis opcache apcu amqp sodium @composer
+RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp soap ffi redis opcache apcu amqp zip sodium @composer
 
 # install system dependencies
 RUN apk add --no-cache nginx supervisor jq trurl envsubst
@@ -38,10 +37,8 @@ RUN apk add --no-cache nginx supervisor jq trurl envsubst
 # define core environment variables (php-cli, php-fpm, entrypoint, utils.sh)
 ENV PUID=$PUID \
     PGID=$PGID \
-    PORT=$PORT \
-    HOSTNAME=$HOSTNAME \
     DATABASE_TIMEOUT=120 \
-    PHP_ERROR_REPORTING=E_ALL \
+    PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
     PHP_DISPLAY_ERRORS=Off \
     PHP_MAX_UPLOAD_SIZE=128m \
     PHP_MAX_EXECUTION_TIME=300 \
@@ -83,48 +80,52 @@ adduser --system --uid ${PUID} shopware
 addgroup --system --gid ${PGID} shopware
 EOF
 
-# remove default configuration files & create default configuration locations
+# configure PHP
+RUN rm -rf /usr/local/etc/php/php.ini*
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/php/docker-php.ini /usr/local/etc/php/conf.d
+
+# configure PHP-FPM
+RUN rm -rf /usr/local/etc/php-fpm.d/* && \
+    rm -rf /usr/local/etc/php-fpm.conf*
+
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/php-fpm/php-fpm.conf /usr/local/etc
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/php-fpm/www.conf /usr/local/etc/php-fpm.d
+
+# configure Nginx
+RUN rm -rf /etc/nginx/http.d/*.conf
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
+
+# configure Supervisor
+RUN mkdir -p /etc/supervisor
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
+
+# add container executables and library scripts
+COPY --chown=${PUID}:${PGID} --chmod=755 docker/bin/swctl /usr/local/bin
+COPY --chown=${PUID}:${PGID} --chmod=644 docker/lib/utils.sh /usr/local/lib
+#COPY --chown=0:0 --chmod=755 docker/bin/entrypoint.sh /usr/sbin
+
+# create and own directories required by services
 RUN <<EOF
-rm -rf /usr/local/etc/php-fpm.d/*
-rm -rf /usr/local/etc/php-fpm.conf*
-rm -rf /usr/local/etc/php/php.ini*
-mkdir -p /var/www/html
-mkdir -p /usr/local/etc/nginx/templates
-mkdir -p /usr/local/etc/supervisor
-mkdir -p /run/php
+mkdir -p /var/log/nginx /var/log/php-fpm /var/www/html /run/php
+chown -R $PUID:$PGID /var/log/nginx /var/log/php-fpm /var/www/html /run/php
 EOF
 
-# config files
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/php.ini /usr/local/etc/php
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/docker-php.ini /usr/local/etc/php/conf.d
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/php-fpm.conf /usr/local/etc
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/www.conf /usr/local/etc/php-fpm.d
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/supervisord.conf /usr/local/etc/supervisor
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/nginx.conf.template /usr/local/etc/nginx/templates/nginx.conf.template
-COPY --chown=${PUID}:${PGID} --chmod=775 docker/conf/fastcgi.conf /usr/local/etc/nginx/fastcgi.conf
-COPY --from=nginx:latest /etc/nginx/mime.types /usr/local/etc/nginx
-
-# executables & libs
-COPY --chown=${PUID}:${PGID} --chmod=755 docker/bin/swctl /usr/local/bin
-COPY --chown=${PUID}:${PGID} --chmod=755 docker/lib/utils.sh /usr/local/lib
-COPY --chown=0:0 --chmod=755 docker/entrypoint.sh /usr/sbin
-
-# set Shopware environment variables
+# set default Shopware environment variables
 ENV APP_ENV=prod \
-    APP_URL=${HOSTNAME} \
+    APP_URL="http://localhosts" \
     APP_URL_CHECK_DISABLED=1 \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
-    MAILER_DSN=null://localhost \
+    MAILER_DSN=null://null \
     DATABASE_URL=mysql://root:root@mysql:3306/shopware \
-    DATABASE_PORT=3306 \
     OPENSEARCH_URL="" \
     BLUE_GREEN_DEPLOYMENT=0 \
     SHOPWARE_ES_ENABLED=0 \
     SHOPWARE_ES_INDEXING_ENABLED=0 \
     SHOPWARE_ES_INDEX_PREFIX="sw" \
     SHOPWARE_ES_THROW_EXCEPTION="1" \
-    STOREFRONT_PROXY_URL="http://localhost" \
     SHOPWARE_HTTP_CACHE_ENABLED=1 \
     SHOPWARE_HTTP_DEFAULT_TTL=7200 \
     SHOPWARE_CACHE_ID=docker \
@@ -136,11 +137,25 @@ ENV APP_ENV=prod \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
 
+# install `shopware-cli`
+# NOTE: this is intentionally installe before the `build` stage since we wan't to retain the CLI for later use
+#RUN <<EOF
+#apk add --no-cache bash
+#curl -1sLf \
+#  'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' \
+#  | bash
+#apk add --no-cache shopware-cli
+#EOF
+
+# initialize a clean build stage
 FROM ghcr.io/friendsofshopware/shopware-cli:latest-php-$PHP_VERSION as build
 
+# copy all files to to image and delete files which can't be ignored but aren't needed
 COPY --link . /app
+RUN rm -rf /app/docker /app/*compose.yaml
 WORKDIR /app
 
+# build assets
 RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
     --mount=type=cache,target=/root/.composer \
     --mount=type=cache,target=/root/.npm \
@@ -151,18 +166,24 @@ FROM init as final
 ARG PUID
 ARG PGID
 
-COPY --from=build --chown=$PUID:$PGID --chmod=755 /app /var/www/html
+COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
 
 VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
 
+# create later mount locations for correct permissions
+# ref: https://serverfault.com/a/984599
+RUN <<EOF
+mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/sitemap
+chown -R $PUID:$PGID /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/sitemap
+EOF
+
 # produce a valid first Nginx config & own files
-RUN chown -R $PUID:$PGID /var/www/html && \
-    chown -R $PUID:$PGID /usr/local/lib && \
-    chown -R $PUID:$PGID /usr/local/etc
+RUN find /var/www/html -type f -exec chmod 644 {} + && \
+    find /var/www/html -type d -exec chmod 755 {} + && \
+    chown -R $PUID:$PGID /var/www/html
 
 WORKDIR /var/www/html
 
-#USER $PUID
 EXPOSE $PORT
 
-ENTRYPOINT ["/usr/sbin/entrypoint.sh"]
+ENTRYPOINT ["swctl", "run"]

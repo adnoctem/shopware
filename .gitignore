@@ -1,9 +1,15 @@
+# custom editor configuration
 /.idea
+# deps
 /vendor/
 
 ###> shopware/core ###
+# env config
 .env*
+.*env
 !.env.template
+
+# ephemeral files
 /public/bundles/*
 /public/media/*
 /public/theme/*
@@ -13,6 +19,8 @@
 !/files/.htaccess
 /var/*
 !/var/.htaccess
+
+# wtf? came with the composer template
 /auth.json
 /install.lock
 public/asset-manifest.json

@@ -2,17 +2,21 @@
 services:
   shopware:
     image: fmjstudios/shopware:latest
+    # user: "1001:1001"
     labels:
       app: shopware
     build:
       context: ..
       dockerfile: Dockerfile
-    env_file: ../.app.env
+    env_file: ../.env
     ports:
-      - "8080:8080"
+      - "80:8080"
     environment:
-      DATABASE_TIMEOUT: 360
+      # APP_URL: "http://shopware.private"
       PHP_DISPLAY_ERRORS: On
+      PHP_ERROR_REPORTING: "E_ALL & ~E_DEPRECATED & ~E_STRICT"
+      # PHP_FPM_ERROR_LOG: /var/log/php-fpm/error.log
+      # PHP_FPM_ACCESS_LOG: /var/log/php-fpm/access.log
     volumes:
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw

@@ -3,12 +3,13 @@
 # 'swctl' is a POSIX shell script meant to automate certain parts of the Shopware deployment tasks
 
 # shellcheck disable=SC3040
-set -o errexit -o nounset -o pipefail
+# set -o errexit -o nounset -o pipefail
+set -o errexit -o pipefail
 
 # shellcheck source=../lib/utils.sh
 . /usr/local/lib/utils.sh
 
-COMPLETED_DATE=$(date '+%Y-%m-%dT%H:%M:%S+00.00')
+COMPLETED_DATE=$(date '+%Y-%m-%dT%H:%M:%S+00:00')
 
 # ----------------------
 #   'help' usage function
