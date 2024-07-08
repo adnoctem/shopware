@@ -34,7 +34,7 @@ RUN install-php-extensions gd intl xdebug mysqli pdo_mysql pcntl sockets bz2 gmp
 # install system dependencies
 RUN apk add --no-cache nginx supervisor jq trurl envsubst
 
-# define core environment variables (php-cli, php-fpm, entrypoint, utils.sh)
+# define core environment variables (php-cli, php-fpm, utils.sh)
 ENV PUID=$PUID \
     PGID=$PGID \
     DATABASE_TIMEOUT=120 \
@@ -104,7 +104,6 @@ COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/supervisor/supervisord.conf
 # add container executables and library scripts
 COPY --chown=${PUID}:${PGID} --chmod=755 docker/bin/swctl /usr/local/bin
 COPY --chown=${PUID}:${PGID} --chmod=644 docker/lib/utils.sh /usr/local/lib
-#COPY --chown=0:0 --chmod=755 docker/bin/entrypoint.sh /usr/sbin
 
 # create and own directories required by services
 RUN <<EOF

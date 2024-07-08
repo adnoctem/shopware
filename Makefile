@@ -101,6 +101,17 @@ endef
 #   Development Environment
 # ---------------------------
 
+define INIT_INFO
+# Initialize the needed files to operate the project.
+endef
+.PHONY: init
+ifeq ($(INIT_HELP), y)
+init:
+	echo "$$INIT_INFO"
+else
+init: dotenv secrets
+endif
+
 define ENV_INFO
 # Create a local development environment for Helm charts. This is a wrapper
 # target which requires the 'dev-cluster' and 'dev-cluster-bootstrap' Make
@@ -111,7 +122,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: bootstrap secrets compose logs
+env: bootstrap compose logs
 endif
 
 define ENV_INFO
@@ -125,7 +136,8 @@ prune:
 	echo "$$ENV_INFO"
 else
 prune:
-	@docker compose -f $(DOCKER_DIR)/compose.yaml down -v
+	@docker compose -f compose.yaml down -v
+	@$(SCRIPT_DIR)/hosts.sh remove
 endif
 
 # ---------------------------
@@ -159,11 +171,7 @@ ifeq ($(PRINT_HELP), y)
 secrets:
 	echo "$$SECRETS_INFO"
 else
-secrets: secrets-prune secrets-dir
-# ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
-	$(call log_success, "Creating CA certificate for $(PROJ_NAME) Docker compose project!")
-	cd $(SECRETS_TLS_DIR) && \
-		cfssl genkey -initca $(CONFIG_TLS_DIR)/cfssl.json | cfssljson -bare ca
+secrets: secrets-dir secrets-gen-ca secrets-gen-server
 endif
 
 define SECRETS_PRUNE_INFO
@@ -188,17 +196,6 @@ endif
 #   Dependencies
 # ---------------------------
 
-.PHONY: dist-dir
-dist-dir:
-	$(call log_notice, "Creating distribution directory for Helm charts at: $(OUT_DIR)")
-	@mkdir -p $(OUT_DIR)
-
-.PHONY: secrets-dir
-secrets-dir:
-	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
-	@mkdir -p $(SECRETS_DIR)
-	@mkdir -p $(SECRETS_TLS_DIR)
-
 .PHONY: bootstrap
 bootstrap:
 	$(call log_scuess, "Bootstrapping Docker compose project")
@@ -213,6 +210,48 @@ compose:
 .PHONY: logs
 logs:
 	@docker logs -f $(shell docker ps -aq -f 'label=application=shopware')
+
+.PHONY: dotenv
+dotenv:
+ifeq ($(shell test -e .env && echo -n yes), yes)
+	$(call log_attention, "Skipping generation of .env for Shopware. File exists!")
+else
+	$(call log_notice, "Generating .env for Shopware configuration from template")
+	@cp .env.template .env
+	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env
+	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+endif
+
+
+.PHONY: secrets-dir
+secrets-dir:
+	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
+	@mkdir -p $(SECRETS_DIR)
+	@mkdir -p $(SECRETS_TLS_DIR)
+
+# ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
+.PHONY: secrets-gen-ca
+secrets-gen-ca:
+ifeq ($(shell test -e $(SECRETS_TLS_DIR)/ca.pem && echo -n yes ), yes)
+	$(call log_attention, "Skipping generation of root certificate authority. Files exist!")
+else
+	$(call log_notice, "Generating root certificate authority at: $(SECRETS_DIR)")
+	@cd $(SECRETS_TLS_DIR) && \
+    	cfssl genkey -initca $(CONFIG_TLS_DIR)/ca-csr.json | cfssljson -bare ca
+endif
+
+# ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
+.PHONY: secrets-gen-server
+secrets-gen-server:
+ifeq ($(shell test -e $(SECRETS_TLS_DIR)/server.pem && echo -n yes ), yes)
+	$(call log_attention, "Skipping generation of server TLS certificate. Files exist!")
+else
+	$(call log_notice, "Generating server TLS certificate at: $(SECRETS_DIR)")
+	@cd $(SECRETS_TLS_DIR) && \
+    	cfssl gencert -ca=$(SECRETS_TLS_DIR)/ca.pem -ca-key=$(SECRETS_TLS_DIR)/ca-key.pem \
+    	-config=$(CONFIG_TLS_DIR)/ca-config.json -profile=server $(CONFIG_TLS_DIR)/server-csr.json \
+    	 | cfssljson -bare server
+endif
 
 # ---------------------------
 # Linting

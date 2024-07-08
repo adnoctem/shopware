@@ -1,55 +1,41 @@
 services:
   traefik:
     image: traefik:v3.1
+    container_name: traefik
     restart: always
-    command:
-      - "--api=true"
-      - "--api.insecure=false"
-      - "--api.debug=true"
-      - "--api.disabledashboardad=true"
-      - "--log=true"
-      - "--log.filepath=/var/log/traefik.log"
-      - "--log.level=ERROR"
-      - "--providers.docker=true"
-      - "--providers.docker.network=public"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.file.filename=/etc/traefik/traefik.yml"
-      - "--entrypoints.dashboard.address=:9100"
-      - "--entrypoints.web.address=:8080"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      - "--entrypoints.websecure.address=:8443"
     ports:
-      - "80:8080"
-      - "443:8443"
-      - "9100:9100"
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - public
+      - internal
     labels:
       - "application=traefik"
       - "traefik.enable=true"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls=true"
-      - "traefik.http.routers.api.tls.domains[0].main=traefik.shopware.private"
-      - "traefik.http.routers.api.tls.domains[0].sans=*.traefik.shopware.private"
-      - "traefik.http.routers.api.service=api@internal"
-      - "traefik.http.routers.api.rule=Host(`traefik.shopware.private`)"
+      - "traefik.http.routers.traefik.entrypoints=http,https"
+      - "traefik.http.routers.traefik.tls.domains[0].main=traefik.shopware.private"
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.traefik.shopware.private"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.shopware.private`)"
     configs:
       - source: traefik.yml
         target: /etc/traefik/traefik.yml
+      - source: traefik-dynamic.yml
+        target: /etc/traefik/traefik-dynamic.yml
     secrets:
-      - source: ca.pem
-        target: /etc/ssl/traefik/ca.pem
-      - source: ca-key.pem
-        target: /etc/ssl/traefik/ca-key.pem
+      - source: server.pem
+        target: /etc/ssl/traefik/server.pem
+      - source: server-key.pem
+        target: /etc/ssl/traefik/server-key.pem
     security_opt:
       - no-new-privileges:true
 
   shopware:
-    image: fmjstudios/shopware:latest
+    image: fmjstudios/shopware:v0.0.1
+    container_name: shopware
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -69,16 +55,19 @@ services:
     labels:
       - "application=shopware"
       - "traefik.enable=true"
-      - "traefik.http.routers.shopware.entrypoints=websecure"
+      - "traefik.http.routers.shopware.entrypoints=http,https"
       - "traefik.http.routers.shopware.tls=true"
       - "traefik.http.routers.shopware.tls.domains[0].main=shopware.private"
       - "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.private"
       - "traefik.http.routers.shopware.rule=Host(`shopware.private`)"
+      - "traefik.http.routers.shopware.service=shopware"
       - "traefik.http.services.shopware.loadbalancer.server.port=8080"
-      - "traefik.http.services.shopware.loadbalancer.server.tls=true"
+      # - "traefik.http.services.shopware.loadbalancer.server.tls=true"
       - "traefik.http.services.shopware.loadbalancer.sticky=true"
       - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
     depends_on:
+      traefik:
+        condition: service_started
       mysql:
         condition: service_started
       opensearch:
@@ -88,6 +77,7 @@ services:
 
   mysql:
     image: mysql:${MYSQL_VERSION:-8}-oracle
+    container_name: mysql
     restart: always
     ports:
       - "3306"
@@ -111,6 +101,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2
+    container_name: opensearch
     ports:
       - "9200"
       - "9600"
@@ -121,34 +112,54 @@ services:
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     networks:
+      - public
       - internal
     labels:
       - "application=opensearch"
-      - "traefik.enable=false"
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensearch.entrypoints=http,https"
+      - "traefik.http.routers.opensearch.tls=true"
+      - "traefik.http.routers.opensearch.tls.domains[0].main=opensearch.shopware.private"
+      - "traefik.http.routers.opensearch.tls.domains[0].sans=*.opensearch.shopware.private"
+      - "traefik.http.routers.opensearch.rule=Host(`opensearch.shopware.private`)"
+      - "traefik.http.routers.opensearch.service=opensearch"
+      - "traefik.http.services.opensearch.loadbalancer.server.port=9600"
 
   mailpit:
     image: axllent/mailpit
+    container_name: mailpit
     ports:
       - "1025"
-      - "8025:8025"
+      - "8025"
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     networks:
+      - public
       - internal
     labels:
       - "application=mailpit"
-      - "traefik.enable=false"
+      - "application=opensearch"
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.entrypoints=http,https"
+      - "traefik.http.routers.mailpit.tls=true"
+      - "traefik.http.routers.mailpit.tls.domains[0].main=mailpit.shopware.private"
+      - "traefik.http.routers.mailpit.tls.domains[0].sans=*.mailpit.shopware.private"
+      - "traefik.http.routers.mailpit.rule=Host(`mailpit.shopware.private`)"
+      - "traefik.http.routers.mailpit.service=mailpit"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
 
 configs:
   traefik.yml:
     file: docker/resources/traefik.yml
+  traefik-dynamic.yml:
+    file: docker/resources/traefik-dynamic.yml
 
 secrets:
-  ca.pem:
-    file: secrets/ssl/ca.pem
-  ca-key.pem:
-    file: secrets/ssl/ca-key.pem
+  server.pem:
+    file: secrets/ssl/server.pem
+  server-key.pem:
+    file: secrets/ssl/server-key.pem
 
 volumes:
   sw-files:

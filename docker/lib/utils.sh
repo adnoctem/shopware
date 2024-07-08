@@ -70,9 +70,9 @@ shopware_install() {
 shopware_setup() {
   log "INFO: Setting up Shopware 6 shop..."
 
-  if [ -z "${SHOPWARE_SKIP_ASSET_COPY}" ]; then pc plugin:update:all; else pc plugin:update:all --skip-asset-build; fi
+  if [ -z "${SHOPWARE_SKIP_ASSET_COPY:-""}" ]; then pc plugin:update:all; else pc plugin:update:all --skip-asset-build; fi
   log "INFO: Running Shopware 6 plugin updates!"
 
-  if [ -n "${SHOPWARE_SKIP_ASSET_COPY}" ]; then pc system:update:finish --skip-asset-build; else pc system:update:finish; fi
+  if [ -n "${SHOPWARE_SKIP_ASSET_COPY:-""}" ]; then pc system:update:finish --skip-asset-build; else pc system:update:finish; fi
   log "INFO: Finishing Shopware 6 update process!"
 }

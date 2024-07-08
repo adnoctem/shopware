@@ -1,9 +1,45 @@
-tls:
-  stores:
-    default:
-      defaultCertificate:
-        certFile: /etc/ssl/traefik/ca.pem
-        keyFile: /etc/ssl/traefik/ca-key.pem
-  certificates:
-    - certFile: /etc/ssl/traefik/ca.pem
-      keyFile: /etc/ssl/traefik/ca-key.pem
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  https:
+    address: ":443"
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: https
+          scheme: https
+          permanent: true
+
+providers:
+  file:
+    filename: /etc/traefik/traefik-dynamic.yml
+    watch: true
+  docker:
+    defaultRule: Host(`shopware.private`)
+    exposedByDefault: false
+    network: public
+    watch: true
+    endpoint: unix:///var/run/docker.sock
+
+log:
+  filePath: /var/log/traefik/traefik.log
+  format: common
+  level: DEBUG
+
+api:
+  insecure: false
+  dashboard: true
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  filters:
+    statusCodes:
+      - "200"
+      - "300-302"
+    retryAttempts: true
+    minDuration: "10s"

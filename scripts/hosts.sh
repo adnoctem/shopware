@@ -19,11 +19,13 @@ CONFIG_END="# SHOPWARE MANAGED END"
 
 CONFIG=$(cat << EOF
 ${CONFIG_START}
-# This file is managed by FMJdev's shopware - do not modify!
+# This segment is managed by FMJdev's shopware - do not modify!
 
 # fmjdev/shopware - FMJ Studios Shopware 6
 127.0.0.1               shopware.private                             # Top-Level Domain
 127.0.0.1               traefik.shopware.private                     # Traefik dashboard subdomain
+127.0.0.1               opensearch.shopware.private                  # OpenSearch WebUI
+127.0.0.1               mailpit.shopware.private                     # Mailpit WebUI
 
 ${CONFIG_END}
 EOF
@@ -46,7 +48,7 @@ function hosts::usage() {
 # ----------------------
 function hosts::add() {
   log::yellow "Adding custom host configuration to ${HOST_CONFIG}"
-  read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N)" choice
+  read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
   case "${choice}" in
   y|Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Installing..."
@@ -54,7 +56,7 @@ function hosts::add() {
     ;;
   *)
     log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
-    return 1
+    return 0
     ;;
   esac
 }
@@ -64,7 +66,7 @@ function hosts::add() {
 # ----------------------
 function hosts::remove() {
   log::yellow "Removing custom host configuration from ${HOST_CONFIG}"
-  read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N)" choice
+  read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
   case "${choice}" in
   y|Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Removing..."
@@ -72,7 +74,7 @@ function hosts::remove() {
     ;;
   *)
     log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
-    return 1
+    return 0
     ;;
   esac
 }
