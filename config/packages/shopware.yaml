@@ -2,17 +2,17 @@
 # We toggled the updater with `shopware.auto_update.enabled = false`
 
 shopware:
-    api:
-        jwt_key:
-            # do not change this, otherwise deployment will fail
-            # NOTES: this forces to use of APP_SECRET for HMAC JWTs, otherwise a key pair would have to be generated
-            # ref: https://developer.shopware.com/release-notes/6.6/6.6.1.0.html#hmac-based-jwt
-            use_app_secret: true
+  api:
+    jwt_key:
+      # do not change this, otherwise deployment will fail
+      # NOTES: this forces to use of APP_SECRET for HMAC JWTs, otherwise a key pair would have to be generated
+      # ref: https://developer.shopware.com/release-notes/6.6/6.6.1.0.html#hmac-based-jwt
+      use_app_secret: true
 
-    auto_update:
-        # Disables the auto updater in the UI
-        enabled: false
+  auto_update:
+    # Disables the auto updater in the UI
+    enabled: false
 
-    admin_worker:
-        # The Admin worker should be disabled on production server.
-        enable_admin_worker: false
+  admin_worker:
+    # The Admin worker should be disabled on production server.
+    enable_admin_worker: false

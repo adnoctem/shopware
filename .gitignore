@@ -19,6 +19,7 @@
 !/files/.htaccess
 /var/*
 !/var/.htaccess
+/secrets/
 
 # wtf? came with the composer template
 /auth.json

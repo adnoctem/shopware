@@ -1,15 +1,13 @@
 #!/usr/bin/env sh
 #
-# 'swctl' is a POSIX shell script meant to automate certain parts of the Shopware deployment tasks
+# 'swctl' is a POSIX shell script meant to automate certain parts of the Shopware deployment tasks, especially those
+# required by the Docker image itself.
 
 # shellcheck disable=SC3040
-# set -o errexit -o nounset -o pipefail
-set -o errexit -o pipefail
+set -o errexit -o nounset -o pipefail
 
 # shellcheck source=../lib/utils.sh
 . /usr/local/lib/utils.sh
-
-COMPLETED_DATE=$(date '+%Y-%m-%dT%H:%M:%S+00:00')
 
 # ----------------------
 #   'help' usage function
@@ -28,33 +26,16 @@ ctl_usage() {
 # ----------------------
 #   'init' function
 # ----------------------
+
+# Wait for the database to become available since we cannot install anything without it
+# Set up Shopware 6 if an installation is found, otherwise install the application
 ctl_init() {
   database_connection_check
-
   if pc system:is-installed; then
-    log "INFO: Running Shopware 6 shop..."
-    if [ "${SHOPWARE_SKIP_ASSET_COPY-""}" ]; then
-      pc system:update:finish --skip-asset-build
-    else
-      pc system:update:finish
-    fi
-
-    if [ "${SHOPWARE_SKIP_ASSET_COPY-""}" ]; then
-      pc plugin:update:all
-    else
-      pc plugin:update:all --skip-asset-build
-    fi
-
+    shopware_setup
     shopware_install_extensions
   else
-    log "INFO: Installing Shopware 6 from scratch..."
-    pc system:install --create-database "--shop-locale=${INSTALL_LOCALE}" "--shop-currency=${INSTALL_CURRENCY}" --force
-    pc user:create "${INSTALL_ADMIN_USERNAME}" --admin --password="${INSTALL_ADMIN_PASSWORD}" -n
-    pc sales-channel:create:storefront --name=Storefront --url="${APP_URL}"
-    pc theme:change --all Storefront
-    pc system:config:set core.frw.completedAt "${COMPLETED_DATE}"
-    pc plugin:refresh
-
+    shopware_install
     shopware_install_extensions
   fi
 }
@@ -63,7 +44,7 @@ ctl_init() {
 #   'start' function
 # ----------------------
 ctl_start() {
-  /usr/bin/supervisord -c /usr/local/etc/supervisor/supervisord.conf
+  /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 }
 
 # --------------------------------

@@ -51,3 +51,28 @@ shopware_update_extensions() {
     pc plugin:update "$plugin"
   done
 }
+
+# Shopware (fresh) application installation
+shopware_install() {
+  completed_at=$(date '+%Y-%m-%dT%H:%M:%S+00:00')
+  storefront_name=Storefront
+
+  log "INFO: Installing Shopware 6..."
+  pc system:install --create-database "--shop-locale=${INSTALL_LOCALE:-"en-GB"}" "--shop-currency=${INSTALL_CURRENCY:-EUR}" --force
+  pc user:create "${INSTALL_ADMIN_USERNAME:-admin}" --admin --password="${INSTALL_ADMIN_PASSWORD:-shopware}" -n
+  pc sales-channel:create:storefront --name="${storefront_name}" --url="${APP_URL:-"http://localhost"}"
+  pc theme:change --all "${storefront_name}"
+  pc system:config:set core.frw.completedAt "${completed_at}"
+  pc plugin:refresh
+}
+
+# Shopware (existing) application setup
+shopware_setup() {
+  log "INFO: Setting up Shopware 6 shop..."
+
+  if [ -z "${SHOPWARE_SKIP_ASSET_COPY}" ]; then pc plugin:update:all; else pc plugin:update:all --skip-asset-build; fi
+  log "INFO: Running Shopware 6 plugin updates!"
+
+  if [ -n "${SHOPWARE_SKIP_ASSET_COPY}" ]; then pc system:update:finish --skip-asset-build; else pc system:update:finish; fi
+  log "INFO: Finishing Shopware 6 update process!"
+}

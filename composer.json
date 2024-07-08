@@ -1,9 +1,10 @@
 {
-  "license": "MIT",
+  "name": "fmjstudios/shopware",
   "version": "0.0.1",
+  "description": "The FMJ Studios build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3.",
+  "license": "MIT",
   "type": "project",
-  "require":
-  {
+  "require": {
     "composer-runtime-api": "^2.0",
     "shopware/administration": "*",
     "shopware/core": "v6.6.3.1",
@@ -11,66 +12,54 @@
     "shopware/storefront": "*",
     "symfony/flex": "~2"
   },
-  "repositories":
-  [
+  "repositories": [
     {
       "type": "path",
       "url": "custom/plugins/*",
-      "options":
-      {
+      "options": {
         "symlink": true
       }
     },
     {
       "type": "path",
       "url": "custom/plugins/*/packages/*",
-      "options":
-      {
+      "options": {
         "symlink": true
       }
     },
     {
       "type": "path",
       "url": "custom/static-plugins/*",
-      "options":
-      {
+      "options": {
         "symlink": true
       }
     }
   ],
   "minimum-stability": "stable",
   "prefer-stable": true,
-  "config":
-  {
-    "allow-plugins":
-    {
+  "config": {
+    "allow-plugins": {
       "symfony/flex": true,
       "symfony/runtime": true
     },
     "optimize-autoloader": true,
     "sort-packages": true
   },
-  "scripts":
-  {
+  "scripts": {
     "auto-scripts": {
       "assets:install": "symfony-cmd"
     },
-    "post-install-cmd":
-    [
+    "post-install-cmd": [
       "@auto-scripts"
     ],
-    "post-update-cmd":
-    [
+    "post-update-cmd": [
       "@auto-scripts"
     ]
   },
-  "extra":
-  {
-    "symfony":
-    {
+  "extra": {
+    "symfony": {
       "allow-contrib": true,
-      "endpoint":
-      [
+      "endpoint": [
         "https://raw.githubusercontent.com/shopware/recipes/flex/main/index.json",
         "flex://defaults"
       ]

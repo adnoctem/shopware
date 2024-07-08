@@ -114,7 +114,7 @@ EOF
 
 # set default Shopware environment variables
 ENV APP_ENV=prod \
-    APP_URL="http://localhosts" \
+    APP_URL="http://localhost" \
     APP_URL_CHECK_DISABLED=1 \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
@@ -136,16 +136,6 @@ ENV APP_ENV=prod \
     INSTALL_CURRENCY=EUR \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
-
-# install `shopware-cli`
-# NOTE: this is intentionally installe before the `build` stage since we wan't to retain the CLI for later use
-#RUN <<EOF
-#apk add --no-cache bash
-#curl -1sLf \
-#  'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' \
-#  | bash
-#apk add --no-cache shopware-cli
-#EOF
 
 # initialize a clean build stage
 FROM ghcr.io/friendsofshopware/shopware-cli:latest-php-$PHP_VERSION as build

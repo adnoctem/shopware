@@ -1,8 +1,8 @@
 .idea
 .github
 docker/Dockerfile
-docker/compose.yaml
-docker/Dockerfile.test
+docker/resources
+compose.yaml
 config/k8s
 config/ssl
 .env.template
@@ -11,3 +11,4 @@ README.md
 LICENSE
 .gitignore
 *.lock
+secrets
