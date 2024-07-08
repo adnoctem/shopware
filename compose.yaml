@@ -1,22 +1,62 @@
-
 services:
-  shopware:
-    image: fmjstudios/shopware:latest
-    # user: "1001:1001"
-    labels:
-      app: shopware
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    env_file: ../.env
+  traefik:
+    image: traefik:v3.1
+    restart: always
+    command:
+      - "--api=true"
+      - "--api.insecure=false"
+      - "--api.debug=true"
+      - "--api.disabledashboardad=true"
+      - "--log=true"
+      - "--log.filepath=/var/log/traefik.log"
+      - "--log.level=ERROR"
+      - "--providers.docker=true"
+      - "--providers.docker.network=public"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/traefik.yml"
+      - "--entrypoints.dashboard.address=:9100"
+      - "--entrypoints.web.address=:8080"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:8443"
     ports:
       - "80:8080"
-    environment:
-      # APP_URL: "http://shopware.private"
-      PHP_DISPLAY_ERRORS: On
-      PHP_ERROR_REPORTING: "E_ALL & ~E_DEPRECATED & ~E_STRICT"
-      # PHP_FPM_ERROR_LOG: /var/log/php-fpm/error.log
-      # PHP_FPM_ACCESS_LOG: /var/log/php-fpm/access.log
+      - "443:8443"
+      - "9100:9100"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - public
+    labels:
+      - "application=traefik"
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.routers.api.tls.domains[0].main=traefik.shopware.private"
+      - "traefik.http.routers.api.tls.domains[0].sans=*.traefik.shopware.private"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.rule=Host(`traefik.shopware.private`)"
+    configs:
+      - source: traefik.yml
+        target: /etc/traefik/traefik.yml
+    secrets:
+      - source: ca.pem
+        target: /etc/ssl/traefik/ca.pem
+      - source: ca-key.pem
+        target: /etc/ssl/traefik/ca-key.pem
+    security_opt:
+      - no-new-privileges:true
+
+  shopware:
+    image: fmjstudios/shopware:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    env_file: .env
+    restart: always
+    ports:
+      - "8080"
     volumes:
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
@@ -24,8 +64,20 @@ services:
       - sw-thumbnail:/var/www/html/public/thumbnail:rw
       - sw-sitemap:/var/www/html/public/sitemap:rw
     networks:
-      - web
+      - public
       - internal
+    labels:
+      - "application=shopware"
+      - "traefik.enable=true"
+      - "traefik.http.routers.shopware.entrypoints=websecure"
+      - "traefik.http.routers.shopware.tls=true"
+      - "traefik.http.routers.shopware.tls.domains[0].main=shopware.private"
+      - "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.private"
+      - "traefik.http.routers.shopware.rule=Host(`shopware.private`)"
+      - "traefik.http.services.shopware.loadbalancer.server.port=8080"
+      - "traefik.http.services.shopware.loadbalancer.server.tls=true"
+      - "traefik.http.services.shopware.loadbalancer.sticky=true"
+      - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
     depends_on:
       mysql:
         condition: service_started
@@ -36,8 +88,6 @@ services:
 
   mysql:
     image: mysql:${MYSQL_VERSION:-8}-oracle
-    labels:
-      app: mysql
     restart: always
     ports:
       - "3306"
@@ -50,16 +100,17 @@ services:
       - db-data:/var/lib/mysql:rw
     networks:
       - internal
+    labels:
+      - "application=mysql"
+      - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1", "-uroot", "-pshopware"]
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1", "-uroot", "-pshopware" ]
       interval: 5s
       timeout: 5s
       retries: 20
 
   opensearch:
     image: opensearchproject/opensearch:2
-    labels:
-      app: opensearch
     ports:
       - "9200"
       - "9600"
@@ -71,11 +122,12 @@ services:
       - opensearch-data:/usr/share/opensearch/data
     networks:
       - internal
+    labels:
+      - "application=opensearch"
+      - "traefik.enable=false"
 
   mailpit:
     image: axllent/mailpit
-    labels:
-      app: mailpit
     ports:
       - "1025"
       - "8025:8025"
@@ -84,6 +136,19 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     networks:
       - internal
+    labels:
+      - "application=mailpit"
+      - "traefik.enable=false"
+
+configs:
+  traefik.yml:
+    file: docker/resources/traefik.yml
+
+secrets:
+  ca.pem:
+    file: secrets/ssl/ca.pem
+  ca-key.pem:
+    file: secrets/ssl/ca-key.pem
 
 volumes:
   sw-files:
@@ -94,7 +159,6 @@ volumes:
   db-data:
   opensearch-data:
 
-
 networks:
-  web:
+  public:
   internal:

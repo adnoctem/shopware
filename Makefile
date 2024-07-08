@@ -38,13 +38,12 @@ export
 # Constants
 # ---------------------------
 
-# Build output
-OUT_DIR := $(ROOT_DIR)/dist
 SCRIPT_DIR := $(ROOT_DIR)/scripts
 CONFIG_DIR := $(ROOT_DIR)/config
-CONFIG_K8S_DIR := $(CONFIG_DIR)/k8s
-DOCKER_DIR := $(ROOT_DIR)/docker
+CONFIG_TLS_DIR := $(ROOT_DIR)/config/ssl
 SECRETS_DIR := $(ROOT_DIR)/secrets
+SECRETS_TLS_DIR := $(ROOT_DIR)/secrets/ssl
+DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
 
 # Documentation
@@ -52,6 +51,7 @@ DOCS_DIR := $(ROOT_DIR)/docs
 MARKDOWNLINT_CONFIG := $(CI_DIR)/linters/.markdown-lint.yml
 
 DATE := $(shell date '+%d.%m.%y-%T')
+VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
 
 # Executables
 helmfile := helmfile
@@ -65,12 +65,7 @@ EXECUTABLES := $(helmfile) $(kind) $(node) $(cfssl)
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
-CHART ?=
-VALUES ?=
-
-REGISTRY ?= ghcr.io
-REGISTRY_USER ?=
-
+TAG ?= v$(VERSION)
 
 # ---------------------------
 # Custom functions
@@ -116,7 +111,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose logs
+env: bootstrap secrets compose logs
 endif
 
 define ENV_INFO
@@ -146,7 +141,47 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
-	docker buildx build -f docker/Dockerfile -t fmjstudios/shopware .
+	docker buildx build -f docker/Dockerfile -t fmjstudios/shopware:$(TAG) .
+endif
+
+# ---------------------------
+#   Secrets
+# ---------------------------
+define SECRETS_INFO
+# Create the secret files required to run the compose project. This creates a CA certificate
+# with Cloudflare's CLI utility `cfssl`.
+#
+# Arguments:
+#	PRINT_HELP: 'y' or 'n'
+endef
+.PHONY: secrets
+ifeq ($(PRINT_HELP), y)
+secrets:
+	echo "$$SECRETS_INFO"
+else
+secrets: secrets-prune secrets-dir
+# ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
+	$(call log_success, "Creating CA certificate for $(PROJ_NAME) Docker compose project!")
+	cd $(SECRETS_TLS_DIR) && \
+		cfssl genkey -initca $(CONFIG_TLS_DIR)/cfssl.json | cfssljson -bare ca
+endif
+
+define SECRETS_PRUNE_INFO
+# Delete the previously created secret files from the repository. This will deleted
+# all temporary folders created before and ask for confirmation to delete the contents
+# of the main secrets folder
+#
+# Arguments:
+#	PRINT_HELP: 'y' or 'n'
+endef
+.PHONY: secrets-prune
+ifeq ($(PRINT_HELP), y)
+secrets-prune:
+	echo "$$SECRETS_PRUNE_INFO"
+else
+secrets-prune:
+	$(call log_success, "Removing local secrets in $(SECRETS_DIR)!")
+	rm -rf $(SECRETS_DIR)
 endif
 
 # ---------------------------
@@ -162,6 +197,12 @@ dist-dir:
 secrets-dir:
 	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
 	@mkdir -p $(SECRETS_DIR)
+	@mkdir -p $(SECRETS_TLS_DIR)
+
+.PHONY: bootstrap
+bootstrap:
+	$(call log_scuess, "Bootstrapping Docker compose project")
+	$(SCRIPT_DIR)/hosts.sh add
 
 .PHONY: compose
 compose:
@@ -169,18 +210,9 @@ compose:
 	@docker compose -f compose.yaml up -d
 	@sleep 5
 
-
 .PHONY: logs
 logs:
-	@docker logs -f $(shell docker ps -aq -f 'label=app=shopware')
-
-.PHONY: registry-login
-registry-login:
-ifndef REGISTRY_USER
-	$(call log_attention, "Cannot login to $(REGISTRY) registry using empty username! REGISTRY_USER must be defined")
-else
-	gh auth token | docker login $(REGISTRY) -u $(REGISTRY_USER) --password-stdin
-endif
+	@docker logs -f $(shell docker ps -aq -f 'label=application=shopware')
 
 # ---------------------------
 # Linting
@@ -190,20 +222,20 @@ lint: markdownlint actionlint shellcheck shfmt gitleaks
 
 .PHONY: markdownlint
 markdownlint:
-	markdownlint -c $(MARKDOWNLINT_CONFIG) '**/*.md' --ignore 'vendor'
+	@markdownlint -c $(MARKDOWNLINT_CONFIG) '**/*.md' --ignore 'vendor'
 
 .PHONY: actionlint
 actionlint:
-	actionlint
+	@actionlint
 
 .PHONY: gitleaks
 gitleaks:
-	gitleaks detect --no-banner --no-git --redact --config $(GITLEAKS_CONFIG) --verbose --source .
+	@gitleaks detect --no-banner --no-git --redact --config $(GITLEAKS_CONFIG) --verbose --source .
 
 .PHONY: shellcheck
 shellcheck:
-	shellcheck scripts/**/*.sh -x
+	@shellcheck scripts/**/*.sh -x
 
 .PHONY: shfmt
 shfmt:
-	shfmt -d .
+	@shfmt -d .
