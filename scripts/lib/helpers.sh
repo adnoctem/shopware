@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 #
 # BASH helper functions for various tasks.
 

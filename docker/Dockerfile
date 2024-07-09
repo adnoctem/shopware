@@ -5,6 +5,7 @@ ARG PHP_VERSION=8.2
 
 # pin versions
 FROM php:$PHP_VERSION-fpm-alpine as base
+FROM mlocati/php-extension-installer:2.2 as php-ext
 
 # OpenContainers Annotations
 # ref: https://github.com/opencontainers/image-spec/blob/main/annotations.md
@@ -24,7 +25,7 @@ ARG PGID=1001
 ARG PORT=8080
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
-COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=php-ext /usr/bin/install-php-extensions /usr/local/bin/
 
 # install Shopware 6 required PHP extensions and the latest version of Composer
 # ref: https://github.com/mlocati/docker-php-extension-installer
@@ -154,6 +155,10 @@ FROM init as final
 
 ARG PUID
 ARG PGID
+
+# add a healthcheck
+HEALTHCHECK --start-period=60s --timeout=30s --retries=10 \
+  CMD curl -f "http://localhost:$PORT" || exit 1
 
 COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
 

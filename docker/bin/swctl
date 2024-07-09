@@ -13,14 +13,14 @@ set -o errexit -o nounset -o pipefail
 #   'help' usage function
 # ----------------------
 ctl_usage() {
-  echo
-  echo "Usage: $(basename "${0}") <COMMAND>"
-  echo
-  echo "init    - Initialize the Shopware 6 instance"
-  echo "start   - Start the supervisord process"
-  echo "run     - Run Shopware 6 (init & start)"
-  echo "help    - Print this usage information"
-  echo
+	echo
+	echo "Usage: $(basename "${0}") <COMMAND>"
+	echo
+	echo "init    - Initialize the Shopware 6 instance"
+	echo "start   - Start the supervisord process"
+	echo "run     - Run Shopware 6 (init & start)"
+	echo "help    - Print this usage information"
+	echo
 }
 
 # ----------------------
@@ -30,49 +30,49 @@ ctl_usage() {
 # Wait for the database to become available since we cannot install anything without it
 # Set up Shopware 6 if an installation is found, otherwise install the application
 ctl_init() {
-  database_connection_check
-  if pc system:is-installed; then
-    shopware_setup
-    shopware_install_extensions
-  else
-    shopware_install
-    shopware_install_extensions
-  fi
+	database_connection_check
+	if pc system:is-installed; then
+		shopware_setup
+		shopware_install_extensions
+	else
+		shopware_install
+		shopware_install_extensions
+	fi
 }
 
 # ----------------------
 #   'start' function
 # ----------------------
 ctl_start() {
-  /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+	/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 }
 
 # --------------------------------
 #   MAIN
 # --------------------------------
 main() {
-  cmd=${1}
+	cmd=${1}
 
-  case "${cmd}" in
-  init)
-    ctl_init
-    return $?
-    ;;
-  start)
-    ctl_start
-    return $?
-    ;;
-  run)
-    ctl_init
-    ctl_start
-    return $?
-    ;;
-  *)
-    log "Unknown command: ${cmd}. See 'help' command for usage information:"
-    hosts::usage
-    return 1
-    ;;
-  esac
+	case "${cmd}" in
+	init)
+		ctl_init
+		return $?
+		;;
+	start)
+		ctl_start
+		return $?
+		;;
+	run)
+		ctl_init
+		ctl_start
+		return $?
+		;;
+	*)
+		log "Unknown command: ${cmd}. See 'help' command for usage information:"
+		hosts::usage
+		return 1
+		;;
+	esac
 }
 
 # ------------

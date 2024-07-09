@@ -4,11 +4,18 @@
 # in staging and development environments.
 
 # Libraries
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
+# shellcheck source=scripts/lib/helpers.sh
 . "${SCRIPT_DIR}/lib/helpers.sh"
+
+# shellcheck source=scripts/lib/paths.sh
 . "${SCRIPT_DIR}/lib/paths.sh"
+
+# shellcheck source=scripts/lib/permissions.sh
 . "${SCRIPT_DIR}/lib/permissions.sh"
+
+# shellcheck source=scripts/lib/stdout.sh
 . "${SCRIPT_DIR}/lib/stdout.sh"
 
 # Constants
@@ -17,7 +24,8 @@ HOST_CONFIG="/etc/hosts"
 CONFIG_START="# SHOPWARE MANAGED START"
 CONFIG_END="# SHOPWARE MANAGED END"
 
-CONFIG=$(cat << EOF
+CONFIG=$(
+  cat <<EOF
 ${CONFIG_START}
 # This segment is managed by FMJdev's shopware - do not modify!
 
@@ -50,9 +58,9 @@ function hosts::add() {
   log::yellow "Adding custom host configuration to ${HOST_CONFIG}"
   read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
   case "${choice}" in
-  y|Y)
+  y | Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Installing..."
-    echo "$CONFIG" | lib::permissions::run_as_root tee -a "${HOST_CONFIG}" > /dev/null
+    echo "$CONFIG" | lib::permissions::run_as_root tee -a "${HOST_CONFIG}" >/dev/null
     ;;
   *)
     log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
@@ -68,7 +76,7 @@ function hosts::remove() {
   log::yellow "Removing custom host configuration from ${HOST_CONFIG}"
   read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
   case "${choice}" in
-  y|Y)
+  y | Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Removing..."
     lib::permissions::run_as_root sed -i "/${CONFIG_START}/,/${CONFIG_END}/d" ${HOST_CONFIG}
     ;;
