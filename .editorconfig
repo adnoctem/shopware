@@ -1,0 +1,13 @@
+# This file is primarily here to ignore the "bin" and "vendor" directories within our `shfmt` linting runs
+# ref: https://github.com/mvdan/sh/issues/288
+
+[bin/**]
+ignore = true
+
+[vendor/**]
+ignore = true
+
+[*.sh]
+indent_style = space
+indent_size = 2
+

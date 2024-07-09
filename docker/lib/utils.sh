@@ -1,11 +1,13 @@
+# shellcheck shell=bash
+
 # logging
 log() {
-    echo "[$(date '+%d-%m-%Y_%T')] $(basename "${0}"): ${*}"
+  echo "[$(date '+%d-%m-%Y_%T')] $(basename "${0}"): ${*}"
 }
 
 # Run commands within the built-in PHP console
 pc() {
-    php -derror_reporting=E_ALL bin/console "$@"
+  php -derror_reporting=E_ALL bin/console "$@"
 }
 
 # Check that the database connection available
@@ -15,15 +17,14 @@ database_connection_check() {
   echo "|--------------------------------------------------------------|"
 
   # shellcheck disable=SC2086
-	database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
-	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
+  database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
+  database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
   tries=0
 
-  until nc -z -w$(( DATABASE_TIMEOUT + 20 )) -v "$database_host" "${database_port:-3306}"
-  do
-    log "Waiting $(( DATABASE_TIMEOUT - tries )) more seconds for database connection to become available"
+  until nc -z -w$((DATABASE_TIMEOUT + 20)) -v "$database_host" "${database_port:-3306}"; do
+    log "Waiting $((DATABASE_TIMEOUT - tries)) more seconds for database connection to become available"
     sleep 1
-    tries=$(( tries + 1 ))
+    tries=$((tries + 1))
 
     if [ "$tries" -eq "${DATABASE_TIMEOUT}" ]; then
       log "FATAL: Could not connect to database within timeout of ${tries} seconds. Exiting."

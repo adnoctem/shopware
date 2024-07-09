@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.0.4
     container_name: traefik
     restart: always
     ports:
@@ -44,6 +44,7 @@ services:
     ports:
       - "8080"
     volumes:
+      - .:/var/www/html:ro
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
       - sw-media:/var/www/html/public/media:rw
@@ -99,16 +100,18 @@ services:
       timeout: 5s
       retries: 20
 
+  # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
   opensearch:
     image: opensearchproject/opensearch:2
     container_name: opensearch
     ports:
-      - "9200"
-      - "9600"
+      - "9200" # REST API
+      - "9600" # Performance Analyzer
     environment:
       OPENSEARCH_INITIAL_ADMIN_PASSWORD: AShopware6Password!
       discovery.type: single-node
       plugins.security.disabled: true
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     networks:
@@ -116,15 +119,38 @@ services:
       - internal
     labels:
       - "application=opensearch"
+      - "traefik.enable=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2
+    container_name: opensearch-dashboards
+    ports:
+      - "5601"
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch:9200"]'
+    networks:
+      - public
+      - internal
+    labels:
+      - "application=opensearch-dashboards"
       - "traefik.enable=true"
-      - "traefik.http.routers.opensearch.entrypoints=http,https"
+      - "traefik.http.routers.opensearch.entrypoints=https"
       - "traefik.http.routers.opensearch.tls=true"
       - "traefik.http.routers.opensearch.tls.domains[0].main=opensearch.shopware.private"
       - "traefik.http.routers.opensearch.tls.domains[0].sans=*.opensearch.shopware.private"
       - "traefik.http.routers.opensearch.rule=Host(`opensearch.shopware.private`)"
       - "traefik.http.routers.opensearch.service=opensearch"
-      - "traefik.http.services.opensearch.loadbalancer.server.port=9600"
+      - "traefik.http.services.opensearch.loadbalancer.server.port=5601"
 
+  # ref: https://mailpit.axllent.org/docs/configuration/runtime-options/
   mailpit:
     image: axllent/mailpit
     container_name: mailpit

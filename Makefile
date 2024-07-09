@@ -1,16 +1,22 @@
-# Copyright (C) 2024 The FMJ Studios Shopware 6 Authors
+# Copyright (C) [2024] The FMJ Studios Shopware 6 Authors
 #
-# This program is free software: you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
 #
-# You should have received a copy of the GNU General Public License along with
-# this program.  If not, see <http://www.gnu.org/licenses/>.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 DBG_MAKEFILE ?=
 ifeq ($(DBG_MAKEFILE),1)
@@ -31,7 +37,7 @@ export ROOT_DIR = $(shell git rev-parse --show-toplevel)
 export PROJ_NAME = $(shell basename "$(ROOT_DIR)")
 
 # Only export variables from here since we do not want to mix the top-level
-# Makfile's notion of 'SOURCES' with the different sub-makes
+# Makefile's notion of 'SOURCES' with the different sub-makes
 export
 
 # ---------------------------
@@ -41,31 +47,40 @@ export
 SCRIPT_DIR := $(ROOT_DIR)/scripts
 CONFIG_DIR := $(ROOT_DIR)/config
 CONFIG_TLS_DIR := $(ROOT_DIR)/config/ssl
+DOCS_DIR := $(ROOT_DIR)/docs
 SECRETS_DIR := $(ROOT_DIR)/secrets
 SECRETS_TLS_DIR := $(ROOT_DIR)/secrets/ssl
+DEPENDENCY_DIR := $(ROOT_DIR)/vendor
 DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
+CI_LINTER_DIR := $(CI_DIR)/linters
 
-# Documentation
-DOCS_DIR := $(ROOT_DIR)/docs
-MARKDOWNLINT_CONFIG := $(CI_DIR)/linters/.markdown-lint.yml
+# Configuration files
+MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
+GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
+DOCKERFILE := $(DOCKER_DIR)/Dockerfile
+
+# general variables
+IMAGE_NAME := fmjstudios/shopware
 
 DATE := $(shell date '+%d.%m.%y-%T')
 VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
 
 # Executables
-helmfile := helmfile
+php := php # at least version 8.2
+composer := composer
 kind := kind
 node := node
 cfssl := cfssl
 
-EXECUTABLES := $(helmfile) $(kind) $(node) $(cfssl)
+EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
 
 # ---------------------------
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
 TAG ?= v$(VERSION)
+STOP ?= n
 
 # ---------------------------
 # Custom functions
@@ -102,30 +117,44 @@ endef
 # ---------------------------
 
 define INIT_INFO
-# Initialize the needed files to operate the project.
+# Initialize the project. This inserts the custom hostnames into /etc/hosts and generates
+# the required files to operate the project. Specifically this generates the .env file as
+# well as TLS certificates within the $(SECRETS_TLS_DIR) for use with Traefik to enable
+# HTTPS for local development.
+#
+# See the target's prerequesites for information about the commands excuted.
 endef
 .PHONY: init
-ifeq ($(INIT_HELP), y)
+ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: dotenv secrets
+init: bootstrap dotenv secrets image
 endif
 
 define ENV_INFO
-# Create a local development environment for Helm charts. This is a wrapper
-# target which requires the 'dev-cluster' and 'dev-cluster-bootstrap' Make
-# targets.
+# Manage the development environment for Shopware 6. This creates a local Docker Compose
+# project using Traefik, which provides HTTPS access to all (public) services within the
+# project. Finally the target will follow the Docker logs for the "shopware" container.
+# If the "DESTROY" variable is set it will remove the environment.
+#
+# See the target's prerequesites for information about the commands excuted.
+#
+# Arguments:
+#   PRINT_HELP: 'y' or 'n'
+# 	STOP: 'y' or 'n'
 endef
 .PHONY: env
 ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: bootstrap compose logs
+env: compose logs
 endif
 
-define ENV_INFO
+define PRUNE_INFO
+# Remove the local configuration
+
 # Create a local development environment for Helm charts. This is a wrapper
 # target which requires the 'dev-cluster' and 'dev-cluster-bootstrap' Make
 # targets.
@@ -133,11 +162,9 @@ endef
 .PHONY: prune
 ifeq ($(PRINT_HELP), y)
 prune:
-	echo "$$ENV_INFO"
+	echo "$$PRUNE_INFO"
 else
-prune:
-	@docker compose -f compose.yaml down -v
-	@$(SCRIPT_DIR)/hosts.sh remove
+prune: prune-compose prune-bootstrap prune-secrets prune-dependencies
 endif
 
 # ---------------------------
@@ -153,7 +180,7 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
-	docker buildx build -f docker/Dockerfile -t fmjstudios/shopware:$(TAG) .
+	docker buildx build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(TAG) .
 endif
 
 # ---------------------------
@@ -174,43 +201,33 @@ else
 secrets: secrets-dir secrets-gen-ca secrets-gen-server
 endif
 
-define SECRETS_PRUNE_INFO
-# Delete the previously created secret files from the repository. This will deleted
-# all temporary folders created before and ask for confirmation to delete the contents
-# of the main secrets folder
-#
-# Arguments:
-#	PRINT_HELP: 'y' or 'n'
-endef
-.PHONY: secrets-prune
-ifeq ($(PRINT_HELP), y)
-secrets-prune:
-	echo "$$SECRETS_PRUNE_INFO"
-else
-secrets-prune:
-	$(call log_success, "Removing local secrets in $(SECRETS_DIR)!")
-	rm -rf $(SECRETS_DIR)
-endif
-
 # ---------------------------
 #   Dependencies
 # ---------------------------
 
+# setup
 .PHONY: bootstrap
 bootstrap:
-	$(call log_scuess, "Bootstrapping Docker compose project")
-	$(SCRIPT_DIR)/hosts.sh add
+	$(call log_success, "Bootstrapping Docker compose project")
+	@$(SCRIPT_DIR)/hosts.sh add
+	@composer install
 
 .PHONY: compose
 compose:
-	$(call log_success, "Starting Docker Compose")
+ifeq ($(STOP), n)
+	$(call log_success, "Starting Docker Compose project")
 	@docker compose -f compose.yaml up -d
 	@sleep 5
+else
+	$(call log_attention, "Stopping Docker Compose project!")
+	@docker compose -f compose.yaml down
+endif
 
 .PHONY: logs
 logs:
 	@docker logs -f $(shell docker ps -aq -f 'label=application=shopware')
 
+# init
 .PHONY: dotenv
 dotenv:
 ifeq ($(shell test -e .env && echo -n yes), yes)
@@ -222,7 +239,7 @@ else
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
 endif
 
-
+# secrets
 .PHONY: secrets-dir
 secrets-dir:
 	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
@@ -253,6 +270,35 @@ else
     	 | cfssljson -bare server
 endif
 
+# prune
+.PHONY: prune-compose
+prune-compose:
+	$(call log_success, "Removing assets created by Docker Compose!")
+	@docker compose -f compose.yaml down -v
+
+.PHONY: prune-bootstrap
+prune-bootstrap:
+	$(call log_success, "Removing local bootstrapping files!")
+	@$(SCRIPT_DIR)/hosts.sh remove
+
+.PHONY: prune-secrets
+prune-secrets:
+	$(call log_success, "Removing local secrets in $(SECRETS_DIR)!")
+	rm -rf $(SECRETS_DIR)
+
+.PHONY: prune-dependencies
+prune-dependencies:
+	$(call log_success, "Removing local dependencies in $(DEPENDENCY_DIR)!")
+	rm -rf $(DEPENDENCY_DIR)
+
+# ---------------------------
+# Checks
+# ---------------------------
+
+.PHONY: tools-check
+tools-check:
+	$(foreach exe,$(EXECUTABLES), $(if $(shell command -v $(exe) 2> /dev/null), $(info Found $(exe)), $(info Please install $(exe))))
+
 # ---------------------------
 # Linting
 # ---------------------------
@@ -273,7 +319,7 @@ gitleaks:
 
 .PHONY: shellcheck
 shellcheck:
-	@shellcheck scripts/**/*.sh -x
+	@shellcheck scripts/*.sh -x
 
 .PHONY: shfmt
 shfmt:

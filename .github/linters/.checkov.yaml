@@ -1,0 +1,5 @@
+skip-check:
+  # skips checks since CHECKOV identifies default values as Basic Auth secret values
+  - CKV_SECRET_4
+  # skips checks for USER in Dockerfile, since the container requires supervisor to run as root (for now)
+  - CKV_DOCKER_3
