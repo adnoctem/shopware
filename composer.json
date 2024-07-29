@@ -1,16 +1,16 @@
 {
   "name": "fmjstudios/shopware",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "The FMJ Studios build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3.",
   "license": "MIT",
   "type": "project",
   "require": {
-    "composer-runtime-api": "^2.0",
-    "shopware/administration": "*",
-    "shopware/core": "v6.6.3.1",
+    "composer-runtime-api": "*",
+    "shopware/administration": "^6.6",
+    "shopware/core": "v6.6.4.1",
     "shopware/elasticsearch": "*",
     "shopware/storefront": "*",
-    "symfony/flex": "~2"
+    "symfony/flex": "^2.4"
   },
   "repositories": [
     {
@@ -64,5 +64,10 @@
         "flex://defaults"
       ]
     }
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.60",
+    "phpstan/phpstan": "^1.11",
+    "phpunit/phpunit": "^11.2"
   }
 }

@@ -1,0 +1,40 @@
+{
+    "name": "fmjstudios/test-plugin",
+    "description": "A Test plugin to test and refer to capabilities of Shopware plugins.",
+    "type": "shopware-platform-plugin",
+    "version": "0.0.1",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "FMJdev",
+            "email": "info@fmj.dev",
+            "homepage": "https://fmj.dev",
+            "role": "owner"
+        }
+    ],
+    "require": {
+        "shopware/core": "~6.6.0"
+    },
+    "extra": {
+        "shopware-plugin-class": "FMJStudiosTestPlugin\\FMJStudiosTestPlugin",
+        "label": {
+            "de-DE": "Skeleton plugin",
+            "en-GB": "Skeleton plugin"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "FMJStudiosTestPlugin\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "FMJStudiosTestPlugin\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/runtime": true
+        }
+    }
+}

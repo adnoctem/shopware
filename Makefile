@@ -54,17 +54,24 @@ DEPENDENCY_DIR := $(ROOT_DIR)/vendor
 DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
 CI_LINTER_DIR := $(CI_DIR)/linters
+PLUGIN_DIR := $(ROOT_DIR)/custom/plugins
+APPS_DIR := $(ROOT_DIR)/custom/apps
 
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
 DOCKERFILE := $(DOCKER_DIR)/Dockerfile
 
+FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
+PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
+APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
+
+
 # general variables
 IMAGE_NAME := fmjstudios/shopware
 
 DATE := $(shell date '+%d.%m.%y-%T')
-VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
+PROJ_VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
 
 # Executables
 php := php # at least version 8.2
@@ -129,7 +136,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: bootstrap dotenv secrets image
+init: bootstrap deps dotenv secrets image
 endif
 
 define ENV_INFO
@@ -210,7 +217,64 @@ endif
 bootstrap:
 	$(call log_success, "Bootstrapping Docker compose project")
 	@$(SCRIPT_DIR)/hosts.sh add
+
+.PHONY:
+deps: deps-composer deps-npm
+
+.PHONY: deps-composer
+deps-composer: deps-composer-project deps-composer-plugins deps-composer-apps
+
+.PHONY: deps-composer-project
+.ONESHELL:
+deps-composer-project:
+	@(call log_sucess, "Install project Composer dependencies")
 	@composer install
+
+.PHONY: deps-composer-plugins
+.ONESHELL:
+deps-composer-plugins:
+	@for plugin in $(PLUGINS); do
+	echo "Installing Composer dependencies for plugin: $$plugin.";
+	@composer install -d custom/plugins/$$plugin
+	done
+
+.PHONY: deps-composer-apps
+.ONESHELL:
+deps-composer-apps:
+	@for app in $(APPS); do
+	echo "Installing Composer dependencies for app: $$app.";
+	@composer install -d custom/apps/$$plugin
+	done
+
+.PHONY: deps-npm
+deps-npm: deps-npm-plugins deps-npm-apps
+
+.PHONY: deps-npm-plugins
+.ONESHELL:
+deps-npm-plugins:
+	@for plugin in $(PLUGINS); do
+	if [[ -e custom/plugins/$$plugin/src/Resources/app/administration/package.json ]]; then
+		echo "Installing plugin: $$plugin NPM dependencies";
+		cd custom/plugins/$$plugin/src/Resources/app/administration;
+		npm install --no-audit --no-fund --prefer-offline;
+	else
+		echo "Skipping NPM dependency installation for plugin: $$plugin"
+	fi
+	done
+
+.PHONY: deps-npm-apps
+.ONESHELL:
+deps-npm-apps:
+	@for app in $(APPS); do
+	if [[ -e custom/apps/$$app/src/Resources/app/administration/package.json ]]; then
+		echo "Installing plugin: $$plugin NPM dependencies";
+		cd custom/apps/$$app/src/Resources/app/administration;
+		npm install --no-audit --no-fund --prefer-offline;
+	else
+		echo "Skipping NPM dependency installation for app: $$app"
+	fi
+	done
+
 
 .PHONY: compose
 compose:
