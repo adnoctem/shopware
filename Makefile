@@ -83,7 +83,6 @@ kind := kind # to be used later
 node := node
 cfssl := cfssl
 
-EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
 EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl)
 
 # ---------------------------
@@ -93,6 +92,7 @@ PRINT_HELP ?=
 TAG ?= v$(VERSION)
 STOP ?= n
 APP ?= shopware
+CI ?= n
 
 # ---------------------------
 # Custom functions
@@ -141,7 +141,20 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: bootstrap deps dotenv secrets image
+init: submodules bootstrap deps dotenv secrets
+endif
+
+define CI_INFO
+# Initialize the project in CI mode.
+#
+# See the target's prerequesites for information about the commands excuted.
+endef
+.PHONY: ci
+ifeq ($(PRINT_HELP), y)
+ci:
+	echo "$$CI_INFO"
+else
+ci: submodules deps
 endif
 
 define ENV_INFO
@@ -154,14 +167,12 @@ define ENV_INFO
 #
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
-# 	STOP: 'y' or 'n'
 endef
 .PHONY: env
 ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose logs
 env: compose-network compose
 endif
 
@@ -204,7 +215,6 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-secrets prune-deps prune-bootstrap prune-output
 prune: prune-output prune-secrets prune-deps prune-bootstrap prune-compose-network
 endif
 
@@ -221,7 +231,6 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
-	docker buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
 	$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
 endif
 
@@ -267,22 +276,16 @@ bootstrap:
 	$(call log_success, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
 
-.PHONY: deps
-deps:
-	$(call log_sucess, "Install project Composer dependencies")
-	@composer install
+.PHONY: submodules
+submodules:
+	$(call log_success, "Pulling latest changes for all submodules!")
+	@git pull --recurse-submodules --jobs=10
 
 .PHONY: compose
 compose:
-ifeq ($(STOP), n)
 	$(call log_success, "Starting Docker Compose project")
-	@docker compose -f compose.yaml up -d
 	@$(docker) compose -f compose.yaml up -d
 	@sleep 5
-else
-	$(call log_attention, "Stopping Docker Compose project!")
-	@docker compose -f compose.yaml down
-endif
 	@$(MAKE) logs APP=shopware
 
 .PHONY: compose-network
@@ -317,8 +320,23 @@ deps-apps:
 
 .PHONY: logs
 logs:
-	@docker logs -f $(shell docker ps -aq -f 'label=application=shopware')
+	@$(docker) logs -f $(shell docker ps -aq -f 'label=application=$(APP)')
 
+.PHONY: tests-plugins
+.ONESHELL:
+tests-plugins:
+	@for plugin in $(PLUGINS); do
+		echo "Running test suite for plugin: $$plugin"
+		$(MAKE) -C custom/plugins/$$plugin tests
+	done
+
+.PHONY: tests-apps
+.ONESHELL:
+tests-apps:
+	@for app in $(APPS); do
+		echo "Running test suite for app: $$app"
+		$(MAKE) -C apps/$$app tests
+	done
 
 # ---------------------------
 # Credentials & Secrets
@@ -334,6 +352,12 @@ else
 	@cp .env.template .env
 	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+ifeq ($(CI), y)
+	$(call log_notice, "Updating .env for Shopware CI")
+	@sed -i -e "s/DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware/DATABASE_URL=mysql://shopware:shopware@loca:3306/shopware/g" .env
+	@sed -i -e "s/OPENSEARCH_URL=http://opensearch:9200/OPENSEARCH_URL=http://localhost:9200/g" .env
+	@sed -i -e "s/MAILER_DSN=smtp://shopware:shopware@mailpit:1025/MAILER_DSN=smtp://shopware:shopware@localhost:8025/g" .env
+endif
 endif
 
 # Generate the TLS CA certificate to create and sign server certificates for Traefik
@@ -386,7 +410,6 @@ output-dir:
 .PHONY: prune-env
 prune-env:
 	$(call log_success, "Removing assets created by Docker Compose!")
-	@docker compose -f compose.yaml down -v
 	@$(docker) compose -f compose.yaml down -v
 
 .PHONY: prune-bootstrap
