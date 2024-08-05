@@ -43,7 +43,8 @@ services:
     ports:
       - "9161"
     volumes:
-      - ./custom:/var/www/html/custom:ro
+      - ./custom/plugins:/var/www/html/custom/plugins:ro
+      - ./apps:/var/www/html/custom/apps:ro
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
       - sw-media:/var/www/html/public/media:rw
@@ -62,9 +63,8 @@ services:
       - "traefik.http.routers.shopware.rule=Host(`shopware.private`)"
       - "traefik.http.routers.shopware.service=shopware"
       - "traefik.http.services.shopware.loadbalancer.server.port=9161"
-      - "traefik.http.services.shopware.loadbalancer.server.tls=true"
-      # - "traefik.http.services.shopware.loadbalancer.sticky=true"
-      # - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.shopware.loadbalancer.sticky=true"
+      - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
     depends_on:
       traefik:
         condition: service_started

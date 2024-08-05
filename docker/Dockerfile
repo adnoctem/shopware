@@ -158,8 +158,8 @@ ARG PUID
 ARG PGID
 
 # add a healthcheck
-HEALTHCHECK --start-period=60s --timeout=30s --retries=10 \
-  CMD curl -f "http://127.0.0.1:$PORT" || exit 1
+# HEALTHCHECK --start-period=60s --timeout=30s --retries=10 \
+#   CMD curl -f "http://127.0.0.1:$PORT" || exit 1
 
 COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
 

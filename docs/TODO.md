@@ -18,4 +18,5 @@
 
 ## 🔗 Links
 
+- [GitHub - Awesome Shopware 6](https://github.com/elgentos/awesome-shopware6)
 - [Packagist - Shopware 6 Plugins](https://packagist.org/?query=shopware&type=shopware-platform-plugin)
