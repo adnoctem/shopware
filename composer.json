@@ -1,6 +1,6 @@
 {
   "name": "fmjstudios/shopware",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "The FMJ Studios build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3.",
   "license": "MIT",
   "type": "project",
