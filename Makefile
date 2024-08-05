@@ -48,6 +48,7 @@ SCRIPT_DIR := $(ROOT_DIR)/scripts
 CONFIG_DIR := $(ROOT_DIR)/config
 CONFIG_TLS_DIR := $(ROOT_DIR)/config/ssl
 DOCS_DIR := $(ROOT_DIR)/docs
+OUTPUT_DIR := $(ROOT_DIR)/dist
 SECRETS_DIR := $(ROOT_DIR)/secrets
 SECRETS_TLS_DIR := $(ROOT_DIR)/secrets/ssl
 DEPENDENCY_DIR := $(ROOT_DIR)/vendor
@@ -68,15 +69,14 @@ APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 
 
 # general variables
-IMAGE_NAME := fmjstudios/shopware
-
 DATE := $(shell date '+%d.%m.%y-%T')
-PROJ_VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
+VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
+NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
 
 # Executables
 php := php # at least version 8.2
 composer := composer
-kind := kind
+kind := kind # to be used later
 node := node
 cfssl := cfssl
 
@@ -86,7 +86,7 @@ EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
-TAG ?= v$(PROJ_VERSION)
+TAG ?= v$(VERSION)
 STOP ?= n
 
 # ---------------------------
@@ -136,7 +136,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: deps dotenv secrets image
+init: bootstrap deps dotenv secrets image
 endif
 
 define ENV_INFO
@@ -156,7 +156,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: bootstrap compose logs
+env: compose logs
 endif
 
 define PRUNE_INFO
@@ -171,7 +171,7 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-compose prune-bootstrap prune-secrets prune-dependencies
+prune: prune-secrets prune-deps prune-bootstrap prune-output
 endif
 
 # ---------------------------
@@ -187,7 +187,19 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
-	docker buildx build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(TAG) -t $(IMAGE_NAME):latest .
+	docker buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
+endif
+
+define BUNDLE_INFO
+# Build a Tarball bundle of the project's sources.
+endef
+.PHONY: bundle
+ifeq ($(PRINT_HELP), y)
+bundle:
+	echo "$$BUNDLE_INFO"
+else
+bundle:
+	tar -cvzf $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
 endif
 
 # ---------------------------
@@ -215,66 +227,13 @@ endif
 # setup
 .PHONY: bootstrap
 bootstrap:
-	$(call log_success, "Bootstrapping Docker compose project")
+	$(call log_success, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
 
-.PHONY:
-deps: deps-composer
-
-.PHONY: deps-composer
-deps-composer: deps-composer-project
-
-.PHONY: deps-composer-project
-.ONESHELL:
-deps-composer-project:
-	@(call log_sucess, "Install project Composer dependencies")
+.PHONY: deps
+deps:
+	$(call log_sucess, "Install project Composer dependencies")
 	@composer install
-
-#.PHONY: deps-composer-plugins
-#.ONESHELL:
-#deps-composer-plugins:
-#	@for plugin in $(PLUGINS); do
-#	echo "Installing Composer dependencies for plugin: $$plugin.";
-#	@composer install -d custom/plugins/$$plugin
-#	done
-#
-#.PHONY: deps-composer-apps
-#.ONESHELL:
-#deps-composer-apps:
-#	@for app in $(APPS); do
-#	echo "Installing Composer dependencies for app: $$app.";
-#	@composer install -d custom/apps/$$plugin
-#	done
-
-#.PHONY: deps-npm
-#deps-npm: deps-npm-plugins deps-npm-apps
-#
-#.PHONY: deps-npm-plugins
-#.ONESHELL:
-#deps-npm-plugins:
-#	@for plugin in $(PLUGINS); do
-#	if [[ -e custom/plugins/$$plugin/src/Resources/app/administration/package.json ]]; then
-#		echo "Installing plugin: $$plugin NPM dependencies";
-#		cd custom/plugins/$$plugin/src/Resources/app/administration;
-#		npm install --no-audit --no-fund --prefer-offline;
-#	else
-#		echo "Skipping NPM dependency installation for plugin: $$plugin"
-#	fi
-#	done
-#
-#.PHONY: deps-npm-apps
-#.ONESHELL:
-#deps-npm-apps:
-#	@for app in $(APPS); do
-#	if [[ -e custom/apps/$$app/src/Resources/app/administration/package.json ]]; then
-#		echo "Installing plugin: $$plugin NPM dependencies";
-#		cd custom/apps/$$app/src/Resources/app/administration;
-#		npm install --no-audit --no-fund --prefer-offline;
-#	else
-#		echo "Skipping NPM dependency installation for app: $$app"
-#	fi
-#	done
-
 
 .PHONY: compose
 compose:
@@ -291,7 +250,12 @@ endif
 logs:
 	@docker logs -f $(shell docker ps -aq -f 'label=application=shopware')
 
-# init
+
+# ---------------------------
+# Credentials & Secrets
+# ---------------------------
+
+# Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv
 dotenv:
 ifeq ($(shell test -e .env && echo -n yes), yes)
@@ -303,13 +267,7 @@ else
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
 endif
 
-# secrets
-.PHONY: secrets-dir
-secrets-dir:
-	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
-	@mkdir -p $(SECRETS_DIR)
-	@mkdir -p $(SECRETS_TLS_DIR)
-
+# Generate the TLS CA certificate to create and sign server certificates for Traefik
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
 .PHONY: secrets-gen-ca
 secrets-gen-ca:
@@ -321,6 +279,7 @@ else
     	cfssl genkey -initca $(CONFIG_TLS_DIR)/ca-csr.json | cfssljson -bare ca
 endif
 
+# Generate the TLS server certificates for Traefik to use
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
 .PHONY: secrets-gen-server
 secrets-gen-server:
@@ -334,9 +293,29 @@ else
     	 | cfssljson -bare server
 endif
 
-# prune
-.PHONY: prune-compose
-prune-compose:
+# ---------------------------
+# Destinations
+# ---------------------------
+
+# Create the secrets directory
+.PHONY: secrets-dir
+secrets-dir:
+	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
+	@mkdir -p $(SECRETS_DIR)
+	@mkdir -p $(SECRETS_TLS_DIR)
+
+# Create the distribution directory
+.PHONY: output-dir
+output-dir:
+	$(call log_notice, "Creating directory for distributables at: $(OUTPUT_DIR)")
+	@mkdir -p $(OUTPUT_DIR)
+
+# ---------------------------
+# Housekeeping
+# ---------------------------
+
+.PHONY: prune-env
+prune-env:
 	$(call log_success, "Removing assets created by Docker Compose!")
 	@docker compose -f compose.yaml down -v
 
@@ -350,17 +329,26 @@ prune-secrets:
 	$(call log_success, "Removing local secrets in $(SECRETS_DIR)!")
 	rm -rf $(SECRETS_DIR)
 
-.PHONY: prune-dependencies
-prune-dependencies:
+.PHONY: prune-output
+prune-output:
+	$(call log_success, "Removing local distributables in $(OUTPUT_DIR)!")
+	rm -rf $(OUTPUT_DIR)
+
+.PHONY: prune-deps
+prune-deps:
 	$(call log_success, "Removing local dependencies in $(DEPENDENCY_DIR)!")
 	rm -rf $(DEPENDENCY_DIR)
 
 # ---------------------------
 # Checks
 # ---------------------------
-.PHONY: version-check
-version-check:
-	@echo -n "$(PROJ_VERSION)"
+.PHONY: version
+version:
+	@echo -n "$(VERSION)"
+
+.PHONY: name
+name:
+	@echo -n "$(NAME)"
 
 .PHONY: tools-check
 tools-check:
