@@ -1,4 +1,4 @@
-name: 'Test Shopware 6'
+name: 'Testing'
 
 permissions: read-all
 
@@ -6,74 +6,116 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
-    paths:
-      - custom/**
+      - "**"
   pull_request:
     branches:
-      - main
-      - release
-    paths:
-      - custom/**
+      - "**"
 
 defaults:
   run:
     shell: bash
 
-
+concurrency:
+  group: "${{ github.workflow }}@${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
 
 jobs:
-  generate-matrix:
-    name: "Generate a Matrix"
+  version:
+    name: Determine package version
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      matrix: ${{ steps.gen-matrix.outputs.matrix }}
+      version: ${{ steps.output-version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate Matrix
-        id: gen-matrix
+      - name: Output version
+        id: output-version
         run: |
-          MATRIX=$(php scripts/ci/matrix.php)
-          echo "matrix<<EOF" >> $GITHUB_OUTPUT
-          echo "$MATRIX" >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          VERSION=$(make version)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-  phpunit:
-    name: Run PHPUnit
+  test:
     runs-on: ubuntu-latest
-    needs: [ 'generate-matrix' ]
+    needs: [ 'version' ]
     permissions:
-      contents: read
+      contents: write
     strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+      fail-fast: false
+      matrix:
+        php-version: [
+          8.2,
+          8.3
+        ]
+        node-version: [
+          20,
+          22
+        ]
     steps:
-      - name: Setup Shopware
-        uses: shopware/setup-shopware@main
-        with:
-          shopware-version: 'trunk'
-          php-version: ${{ matrix.php_version }}
-          php-extensions: pcov
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
         with:
-          sparse-checkout: |
-            custom
+          php-version: '${{ matrix.php-version }}'
+          tools: composer
 
-      - name: Install Extension with Composer
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
         run: |
-          composer require $(composer -d custom/plugins/${{ matrix.plugin }} config name)
+          echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-      - name: Run PHPUnit
-        working-directory: ${{ github.workspace }}/custom/plugins/${{ matrix.plugins }}
+      - name: Cache Composer
+        id: composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+
+      - name: Set composer vars
         run: |
-          ${{ github.workspace }}/vendor/bin/phpunit --coverage-clover clover.xml
+          {
+            echo "COMPOSER_DISABLE_NETWORK=${{ steps.composer.outputs.cache-hit && '1' || '0'  }}"
+            echo "COMPOSER_NO_AUDIT=1"
+            echo "COMPOSER_FUND=0"
+            echo "COMPOSER_ROOT_VERSION=${{ needs.version.outputs.version }}"
+          } >> "$GITHUB_ENV"
 
-      - name:
+      - name: Install plugins and dependencies
+        run: |
+          make ci
+          make dotenv CI=y
 
-          
+      - name: Create Docker Compose apps
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: "./ci/compose.yml"
 
+      - name: Run tests
+        run: |
+          make tests
+
+      - name: Check Git tag
+        id: check-tag
+        uses: mukunku/tag-exists-action@v1.6.0
+        with:
+          tag: 'v${{ needs.version.outputs.version }}'
+
+      - name: Create tag
+        if: steps.check-tag.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/v${{ needs.version.outputs.version }}',
+              sha: context.sha
+            })
