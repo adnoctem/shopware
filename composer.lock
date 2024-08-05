@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "352ad3381e7923fbb3ffc0cb7dfb1948",
+    "content-hash": "0f8806626479746fd89283d5cc56b63e",
     "packages": [
         {
             "name": "brick/math",
@@ -1799,6 +1799,188 @@
                 }
             ],
             "time": "2024-03-20T12:50:41+00:00"
+        },
+        {
+            "name": "frosh/lazy-sizes",
+            "version": "3.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/FriendsOfShopware/FroshLazySizes.git",
+                "reference": "e631e58d80765b30bed1357b3040a7c64bc2f9fc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/FriendsOfShopware/FroshLazySizes/zipball/e631e58d80765b30bed1357b3040a7c64bc2f9fc",
+                "reference": "e631e58d80765b30bed1357b3040a7c64bc2f9fc",
+                "shasum": ""
+            },
+            "require": {
+                "shopware/core": "~6.6.0"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "shopware-plugin-class": "Frosh\\LazySizes\\FroshLazySizes",
+                "label": {
+                    "de-DE": "LazySizes und LazyLoading für passende Bilder-Sizes",
+                    "en-GB": "LazySizes and LazyLoading for suitable image sizes"
+                },
+                "description": {
+                    "de-DE": "Lass die beste Thumbnail-Größe automatisch berechnen. Dadurch musst du dir keine Gedanken um das Attribut \"sizes\" bei den Bildern zu machen und gewinnst an Score.",
+                    "en-GB": "Automatically calculate the best thumbnail size. This means you don't have to worry about the \"sizes\" attribute for the images. Additionally, you gain a score."
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshLazySizes",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshLazySizes"
+                },
+                "supportLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshLazySizes/issues",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshLazySizes/issues"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Frosh\\LazySizes\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "mit"
+            ],
+            "authors": [
+                {
+                    "name": "FriendsOfShopware",
+                    "homepage": "https://friendsofshopware.de"
+                }
+            ],
+            "description": "Automatically calculate the best thumbnail size. This means you don't have to worry about the \"sizes\" attribute for the images. Additionally, you gain a score.",
+            "keywords": [
+                "media",
+                "shopware",
+                "thumbnail"
+            ],
+            "support": {
+                "issues": "https://github.com/FriendsOfShopware/FroshLazySizes/issues",
+                "source": "https://github.com/FriendsOfShopware/FroshLazySizes/tree/3.0.0"
+            },
+            "time": "2024-04-17T19:21:16+00:00"
+        },
+        {
+            "name": "frosh/nicer-admin",
+            "version": "1.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/FriendsOfShopware/FroshNicerAdmin.git",
+                "reference": "4b1c18ee77e334ea2e2499587fa30ae7e3175e0e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/FriendsOfShopware/FroshNicerAdmin/zipball/4b1c18ee77e334ea2e2499587fa30ae7e3175e0e",
+                "reference": "4b1c18ee77e334ea2e2499587fa30ae7e3175e0e",
+                "shasum": ""
+            },
+            "require": {
+                "shopware/core": "^6.4.0"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "shopware-plugin-class": "Frosh\\NicerAdmin\\FroshNicerAdmin",
+                "copyright": "Friends of Shopware",
+                "label": {
+                    "de-DE": "Nice Administration Changes",
+                    "en-GB": "Nice Administration Changes"
+                },
+                "description": {
+                    "de-DE": "Dieses Plugin ist eine Revolution für die Administration! Wir verwenden in der Administration u.a. die beliebte Comic Sans und ein Hund begrüßt dich beim Login.",
+                    "en-GB": "This plugin is a game-changer for administration! We use the popular Comic Sans in administration, among other things, and a dog greets you when you log in."
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshNicerAdmin",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshNicerAdmin"
+                },
+                "supportLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshNicerAdmin/issues",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshNicerAdmin/issues"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Frosh\\NicerAdmin\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Friends of Shopware"
+                }
+            ],
+            "description": "This plugin is a game-changer for administration! With an intuitive interface and streamlined features, managing your administration has never been better.",
+            "support": {
+                "issues": "https://github.com/FriendsOfShopware/FroshNicerAdmin/issues",
+                "source": "https://github.com/FriendsOfShopware/FroshNicerAdmin/tree/1.0.2"
+            },
+            "time": "2023-03-19T20:13:06+00:00"
+        },
+        {
+            "name": "frosh/tools",
+            "version": "2.1.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/FriendsOfShopware/FroshTools.git",
+                "reference": "edd506cff25648d913355afc1a307bbcfb2bbef6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/FriendsOfShopware/FroshTools/zipball/edd506cff25648d913355afc1a307bbcfb2bbef6",
+                "reference": "edd506cff25648d913355afc1a307bbcfb2bbef6",
+                "shasum": ""
+            },
+            "require": {
+                "shopware/core": "~6.6.0"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "shopware-plugin-class": "Frosh\\Tools\\FroshTools",
+                "label": {
+                    "de-DE": "Tools",
+                    "en-GB": "Tools"
+                },
+                "description": {
+                    "de-DE": "Die kostenlose Shopware 6 App beinhaltet mehrere Werkzeuge um den Shop besser zu verwalten. Optimierter Cache Manager, Log Viewer um die Logeinträge zu sehen oder Tasks auszuführen.",
+                    "en-GB": "The free Shopware 6 app include several tools to manage the store much better like a cache manager, log viewer to see the log entries, run the tasks or see the system status."
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshTools",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshTools"
+                },
+                "supportLink": {
+                    "de-DE": "https://github.com/FriendsOfShopware/FroshTools/issues",
+                    "en-GB": "https://github.com/FriendsOfShopware/FroshTools/issues"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Frosh\\Tools\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "FriendsOfShopware",
+                    "homepage": "https://friendsofshopware.com"
+                }
+            ],
+            "description": "Provides some basic things for managing the Shopware Installation",
+            "support": {
+                "issues": "https://github.com/FriendsOfShopware/FroshTools/issues",
+                "source": "https://github.com/FriendsOfShopware/FroshTools/tree/2.1.3"
+            },
+            "time": "2024-07-22T10:55:54+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -6322,16 +6504,16 @@
         },
         {
             "name": "symfony/flex",
-            "version": "v2.4.5",
+            "version": "v2.4.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/flex.git",
-                "reference": "b0a405f40614c9f584b489d54f91091817b0e26e"
+                "reference": "4dc11919791f81d087a12db2ab4c7e044431ef6b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/flex/zipball/b0a405f40614c9f584b489d54f91091817b0e26e",
-                "reference": "b0a405f40614c9f584b489d54f91091817b0e26e",
+                "url": "https://api.github.com/repos/symfony/flex/zipball/4dc11919791f81d087a12db2ab4c7e044431ef6b",
+                "reference": "4dc11919791f81d087a12db2ab4c7e044431ef6b",
                 "shasum": ""
             },
             "require": {
@@ -6367,7 +6549,7 @@
             "description": "Composer plugin for Symfony",
             "support": {
                 "issues": "https://github.com/symfony/flex/issues",
-                "source": "https://github.com/symfony/flex/tree/v2.4.5"
+                "source": "https://github.com/symfony/flex/tree/v2.4.6"
             },
             "funding": [
                 {
@@ -6383,7 +6565,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-02T08:16:47+00:00"
+            "time": "2024-04-27T10:22:22+00:00"
         },
         {
             "name": "symfony/framework-bundle",

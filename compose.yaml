@@ -11,7 +11,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - public
-      - internal
     labels:
       - "application=traefik"
       - "traefik.enable=true"
@@ -34,7 +33,7 @@ services:
       - no-new-privileges:true
 
   shopware:
-    image: fmjstudios/shopware:v0.0.1
+    image: fmjstudios/shopware:latest
     container_name: shopware
     build:
       context: .
@@ -42,9 +41,9 @@ services:
     env_file: .env
     restart: always
     ports:
-      - "8080"
+      - "9161"
     volumes:
-      - .:/var/www/html:ro
+      - ./custom:/var/www/html/custom:ro
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
       - sw-media:/var/www/html/public/media:rw
@@ -56,16 +55,16 @@ services:
     labels:
       - "application=shopware"
       - "traefik.enable=true"
-      - "traefik.http.routers.shopware.entrypoints=http,https"
+      - "traefik.http.routers.shopware.entrypoints=https,http"
       - "traefik.http.routers.shopware.tls=true"
       - "traefik.http.routers.shopware.tls.domains[0].main=shopware.private"
       - "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.private"
       - "traefik.http.routers.shopware.rule=Host(`shopware.private`)"
       - "traefik.http.routers.shopware.service=shopware"
-      - "traefik.http.services.shopware.loadbalancer.server.port=8080"
-      # - "traefik.http.services.shopware.loadbalancer.server.tls=true"
-      - "traefik.http.services.shopware.loadbalancer.sticky=true"
-      - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.shopware.loadbalancer.server.port=9161"
+      - "traefik.http.services.shopware.loadbalancer.server.tls=true"
+      # - "traefik.http.services.shopware.loadbalancer.sticky=true"
+      # - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
     depends_on:
       traefik:
         condition: service_started
@@ -142,7 +141,7 @@ services:
     labels:
       - "application=opensearch-dashboards"
       - "traefik.enable=true"
-      - "traefik.http.routers.opensearch.entrypoints=https"
+      - "traefik.http.routers.opensearch.entrypoints=http,https"
       - "traefik.http.routers.opensearch.tls=true"
       - "traefik.http.routers.opensearch.tls.domains[0].main=opensearch.shopware.private"
       - "traefik.http.routers.opensearch.tls.domains[0].sans=*.opensearch.shopware.private"

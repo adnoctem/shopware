@@ -86,7 +86,7 @@ EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
-TAG ?= v$(VERSION)
+TAG ?= v$(PROJ_VERSION)
 STOP ?= n
 
 # ---------------------------
@@ -136,7 +136,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: bootstrap deps dotenv secrets image
+init: deps dotenv secrets image
 endif
 
 define ENV_INFO
@@ -156,7 +156,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose logs
+env: bootstrap compose logs
 endif
 
 define PRUNE_INFO
@@ -187,7 +187,7 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
-	docker buildx build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(TAG) .
+	docker buildx build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(TAG) -t $(IMAGE_NAME):latest .
 endif
 
 # ---------------------------
@@ -219,10 +219,10 @@ bootstrap:
 	@$(SCRIPT_DIR)/hosts.sh add
 
 .PHONY:
-deps: deps-composer deps-npm
+deps: deps-composer
 
 .PHONY: deps-composer
-deps-composer: deps-composer-project deps-composer-plugins deps-composer-apps
+deps-composer: deps-composer-project
 
 .PHONY: deps-composer-project
 .ONESHELL:
@@ -230,50 +230,50 @@ deps-composer-project:
 	@(call log_sucess, "Install project Composer dependencies")
 	@composer install
 
-.PHONY: deps-composer-plugins
-.ONESHELL:
-deps-composer-plugins:
-	@for plugin in $(PLUGINS); do
-	echo "Installing Composer dependencies for plugin: $$plugin.";
-	@composer install -d custom/plugins/$$plugin
-	done
+#.PHONY: deps-composer-plugins
+#.ONESHELL:
+#deps-composer-plugins:
+#	@for plugin in $(PLUGINS); do
+#	echo "Installing Composer dependencies for plugin: $$plugin.";
+#	@composer install -d custom/plugins/$$plugin
+#	done
+#
+#.PHONY: deps-composer-apps
+#.ONESHELL:
+#deps-composer-apps:
+#	@for app in $(APPS); do
+#	echo "Installing Composer dependencies for app: $$app.";
+#	@composer install -d custom/apps/$$plugin
+#	done
 
-.PHONY: deps-composer-apps
-.ONESHELL:
-deps-composer-apps:
-	@for app in $(APPS); do
-	echo "Installing Composer dependencies for app: $$app.";
-	@composer install -d custom/apps/$$plugin
-	done
-
-.PHONY: deps-npm
-deps-npm: deps-npm-plugins deps-npm-apps
-
-.PHONY: deps-npm-plugins
-.ONESHELL:
-deps-npm-plugins:
-	@for plugin in $(PLUGINS); do
-	if [[ -e custom/plugins/$$plugin/src/Resources/app/administration/package.json ]]; then
-		echo "Installing plugin: $$plugin NPM dependencies";
-		cd custom/plugins/$$plugin/src/Resources/app/administration;
-		npm install --no-audit --no-fund --prefer-offline;
-	else
-		echo "Skipping NPM dependency installation for plugin: $$plugin"
-	fi
-	done
-
-.PHONY: deps-npm-apps
-.ONESHELL:
-deps-npm-apps:
-	@for app in $(APPS); do
-	if [[ -e custom/apps/$$app/src/Resources/app/administration/package.json ]]; then
-		echo "Installing plugin: $$plugin NPM dependencies";
-		cd custom/apps/$$app/src/Resources/app/administration;
-		npm install --no-audit --no-fund --prefer-offline;
-	else
-		echo "Skipping NPM dependency installation for app: $$app"
-	fi
-	done
+#.PHONY: deps-npm
+#deps-npm: deps-npm-plugins deps-npm-apps
+#
+#.PHONY: deps-npm-plugins
+#.ONESHELL:
+#deps-npm-plugins:
+#	@for plugin in $(PLUGINS); do
+#	if [[ -e custom/plugins/$$plugin/src/Resources/app/administration/package.json ]]; then
+#		echo "Installing plugin: $$plugin NPM dependencies";
+#		cd custom/plugins/$$plugin/src/Resources/app/administration;
+#		npm install --no-audit --no-fund --prefer-offline;
+#	else
+#		echo "Skipping NPM dependency installation for plugin: $$plugin"
+#	fi
+#	done
+#
+#.PHONY: deps-npm-apps
+#.ONESHELL:
+#deps-npm-apps:
+#	@for app in $(APPS); do
+#	if [[ -e custom/apps/$$app/src/Resources/app/administration/package.json ]]; then
+#		echo "Installing plugin: $$plugin NPM dependencies";
+#		cd custom/apps/$$app/src/Resources/app/administration;
+#		npm install --no-audit --no-fund --prefer-offline;
+#	else
+#		echo "Skipping NPM dependency installation for app: $$app"
+#	fi
+#	done
 
 
 .PHONY: compose
@@ -358,6 +358,9 @@ prune-dependencies:
 # ---------------------------
 # Checks
 # ---------------------------
+.PHONY: version-check
+version-check:
+	@echo -n "$(PROJ_VERSION)"
 
 .PHONY: tools-check
 tools-check:

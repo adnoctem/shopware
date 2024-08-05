@@ -22,7 +22,7 @@ FROM base as init
 ARG PHP_VERSION
 ARG PUID=1001
 ARG PGID=1001
-ARG PORT=8080
+ARG PORT=9161
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 COPY --from=php-ext /usr/bin/install-php-extensions /usr/local/bin/
@@ -145,7 +145,8 @@ COPY --link . /app
 RUN rm -rf /app/docker /app/*compose.yaml
 WORKDIR /app
 
-# build assets
+# build assets & install dependencies
+# ref: https://sw-cli.fos.gg/commands/project/#shopware-cli-project-ci
 RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
     --mount=type=cache,target=/root/.composer \
     --mount=type=cache,target=/root/.npm \
@@ -158,7 +159,7 @@ ARG PGID
 
 # add a healthcheck
 HEALTHCHECK --start-period=60s --timeout=30s --retries=10 \
-  CMD curl -f "http://localhost:$PORT" || exit 1
+  CMD curl -f "http://127.0.0.1:$PORT" || exit 1
 
 COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
 

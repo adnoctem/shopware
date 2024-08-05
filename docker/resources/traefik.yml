@@ -25,6 +25,9 @@ providers:
     watch: true
     endpoint: unix:///var/run/docker.sock
 
+serversTransport:
+  insecureSkipVerify: true
+
 log:
   filePath: /var/log/traefik/traefik.log
   format: common
@@ -37,9 +40,9 @@ api:
 accessLog:
   filePath: /var/log/traefik/access.log
   format: json
-  filters:
-    statusCodes:
-      - "200"
-      - "300-302"
-    retryAttempts: true
-    minDuration: "10s"
+#  filters:
+#    statusCodes:
+#      - "200"
+#      - "300-302"
+#    retryAttempts: true
+#    minDuration: "10s"
