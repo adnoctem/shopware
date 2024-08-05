@@ -67,6 +67,8 @@ FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
 PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
 APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 
+COMPOSE_SUBNET := 172.25.0.0/16
+COMPOSE_GATEWAY_IP := 172.25.0.1
 
 # general variables
 DATE := $(shell date '+%d.%m.%y-%T')
@@ -74,6 +76,7 @@ VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' 
 NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
 
 # Executables
+docker := docker
 php := php # at least version 8.2
 composer := composer
 kind := kind # to be used later
@@ -81,6 +84,7 @@ node := node
 cfssl := cfssl
 
 EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
+EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl)
 
 # ---------------------------
 # User-defined variables
@@ -88,6 +92,7 @@ EXECUTABLES := $(php) $(composer) $(kind) $(node) $(cfssl)
 PRINT_HELP ?=
 TAG ?= v$(VERSION)
 STOP ?= n
+APP ?= shopware
 
 # ---------------------------
 # Custom functions
@@ -157,6 +162,34 @@ env:
 	echo "$$ENV_INFO"
 else
 env: compose logs
+env: compose-network compose
+endif
+
+define ENV_CLEANUP_INFO
+# Clean up the development environment for Shopware 6.
+#
+# Arguments:
+#   PRINT_HELP: 'y' or 'n'
+endef
+.PHONY: env-cleanup
+ifeq ($(PRINT_HELP), y)
+env-cleanup:
+	echo "$$ENV_CLEANUP_INFO"
+else
+env-cleanup:
+	$(call log_attention, "Stopping Docker Compose project!")
+	@$(docker) compose -f compose.yaml down -v
+endif
+
+define TESTS_INFO
+# Run each plugin or app's custom test suite via sub-makes.
+endef
+.PHONY: tests
+ifeq ($(PRINT_HELP), y)
+tests:
+	echo "$$TESTS_INFO"
+else
+tests: tests-apps tests-plugins
 endif
 
 define PRUNE_INFO
@@ -172,6 +205,7 @@ prune:
 	echo "$$PRUNE_INFO"
 else
 prune: prune-secrets prune-deps prune-bootstrap prune-output
+prune: prune-output prune-secrets prune-deps prune-bootstrap prune-compose-network
 endif
 
 # ---------------------------
@@ -188,6 +222,7 @@ image:
 else
 image:
 	docker buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
+	$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
 endif
 
 define BUNDLE_INFO
@@ -201,6 +236,8 @@ else
 bundle:
 	tar -cvzf $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
 endif
+
+
 
 # ---------------------------
 #   Secrets
@@ -240,11 +277,43 @@ compose:
 ifeq ($(STOP), n)
 	$(call log_success, "Starting Docker Compose project")
 	@docker compose -f compose.yaml up -d
+	@$(docker) compose -f compose.yaml up -d
 	@sleep 5
 else
 	$(call log_attention, "Stopping Docker Compose project!")
 	@docker compose -f compose.yaml down
 endif
+	@$(MAKE) logs APP=shopware
+
+.PHONY: compose-network
+compose-network:
+	$(call log_notice, "Creating Docker Compose networks")
+	@$(docker) network rm public --force
+	@$(docker) network create \
+		--subnet $(COMPOSE_SUBNET) \
+		--gateway $(COMPOSE_GATEWAY_IP) \
+		public
+
+.PHONY: deps
+deps: deps-plugins deps-apps
+	$(call log_sucess, "Install project Composer dependencies")
+	@composer install
+
+.PHONY: deps-plugins
+.ONESHELL:
+deps-plugins:
+	@for plugin in $(PLUGINS); do
+		echo "Installing dependencies for plugin: $$plugin"
+		$(MAKE) -C custom/plugins/$$plugin deps
+	done
+
+.PHONY: deps-apps
+.ONESHELL:
+deps-apps:
+	@for app in $(APPS); do
+		echo "Installing dependencies for app: $$app"
+		$(MAKE) -C apps/$$app deps
+	done
 
 .PHONY: logs
 logs:
@@ -318,11 +387,17 @@ output-dir:
 prune-env:
 	$(call log_success, "Removing assets created by Docker Compose!")
 	@docker compose -f compose.yaml down -v
+	@$(docker) compose -f compose.yaml down -v
 
 .PHONY: prune-bootstrap
 prune-bootstrap:
 	$(call log_success, "Removing local bootstrapping files!")
 	@$(SCRIPT_DIR)/hosts.sh remove
+
+.PHONY: prune-compose-network
+prune-compose-network:
+	$(call log_success, "Removing public Docker Compose network!")
+	@$(docker) network rm public --force
 
 .PHONY: prune-secrets
 prune-secrets:

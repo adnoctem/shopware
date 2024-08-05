@@ -33,6 +33,12 @@ database_connection_check() {
   done
 }
 
+# Shopware Clear cache using the global application environment variable APP_ENV
+shopware_clear_cache() {
+  log "INFO: Clearing Shopware 6 HTTP cache for environment \"$APP_ENV\""
+  pc cache:clear --env="${APP_ENV}" -n
+}
+
 # Install all Shopware 6 extensions
 shopware_install_extensions() {
   list_with_updates=$(php bin/console plugin:list --json | jq 'map(select(.installedAt == null)) | .[].name' -r)
