@@ -1,8 +1,5 @@
 skip-check:
   # skips checks since CHECKOV identifies default values as Basic Auth secret values
   - CKV_SECRET_4
-  # do not require a HEALTHCHECK instruction in the Dockerfile
-  # this is due to the fact that the shopware API is OAuth protected so healthchecks are tricky
-  - CKV_DOCKER_2
   # skips checks for USER in Dockerfile, since the container requires supervisor to run as root (for now)
   - CKV_DOCKER_3

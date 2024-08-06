@@ -15,6 +15,9 @@
 ## 💡 Ideas
 
 - Create the [Helm Chart](https://github.com/fmjstudios/helm) for this repository
+- Write a plugin implementing `OAuth2/OIDC`, `SAML`, `LDAP` for the administration and at least `OAuth2/OIDC` for the
+  frontend
+- Write a plugin implementing autocomplete for the order process (internationally)
 
 ## 🔗 Links
 

@@ -38,6 +38,7 @@ RUN apk add --no-cache nginx supervisor jq trurl envsubst
 # define core environment variables (php-cli, php-fpm, utils.sh)
 ENV PUID=$PUID \
     PGID=$PGID \
+    PORT=$PORT \
     DATABASE_TIMEOUT=120 \
     PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
     PHP_DISPLAY_ERRORS=Off \
@@ -156,10 +157,12 @@ FROM init as final
 
 ARG PUID
 ARG PGID
+ARG PORT
 
 # add a healthcheck
-# HEALTHCHECK --start-period=60s --timeout=30s --retries=10 \
-#   CMD curl -f "http://127.0.0.1:$PORT" || exit 1
+# ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
+HEALTHCHECK --start-period=3m --timeout=5s --interval=1m --retries=10 \
+   CMD curl --fail "http://localhost:${PORT:-9161}/api/_info/health-check" || exit 1
 
 COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
 
