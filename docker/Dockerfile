@@ -24,6 +24,36 @@ ARG PUID=1001
 ARG PGID=1001
 ARG PORT=9161
 
+# install gosu
+# ref: https://github.com/tianon/gosu/blob/master/INSTALL.md#from-alpine-37
+ENV GOSU_VERSION 1.17
+RUN set -eux; \
+	\
+	apk add --no-cache --virtual .gosu-deps \
+		ca-certificates \
+		dpkg \
+		gnupg \
+	; \
+	\
+	dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
+	wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
+	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
+	\
+# verify the signature
+	export GNUPGHOME="$(mktemp -d)"; \
+	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+	gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
+	gpgconf --kill all; \
+	rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
+	\
+# clean up fetch dependencies
+	apk del --no-network .gosu-deps; \
+	\
+	chmod +x /usr/local/bin/gosu; \
+# verify that the binary works
+	gosu --version; \
+	gosu nobody true
+
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 COPY --from=php-ext /usr/bin/install-php-extensions /usr/local/bin/
 
@@ -100,7 +130,7 @@ COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
 COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
 
 # configure Supervisor
-RUN mkdir -p /etc/supervisor
+RUN mkdir -p /etc/supervisor /etc/supervisor/conf.d
 COPY --chown=${PUID}:${PGID} --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
 
 # add container executables and library scripts
@@ -109,9 +139,12 @@ COPY --chown=${PUID}:${PGID} --chmod=644 docker/lib/utils.sh /usr/local/lib
 
 # create and own directories required by services
 RUN <<EOF
-mkdir -p /var/log/nginx /var/log/php-fpm /var/www/html /run/php
-chown -R $PUID:$PGID /var/log/nginx /var/log/php-fpm /var/www/html /run/php
+mkdir -p /var/log/nginx /var/log/php-fpm /var/log/supervisor /var/www/html /run/php
+chown -R $PUID:$PGID /var/log/nginx /var/lib/nginx /var/log/php-fpm /var/log/supervisor /var/www/html /run/php
 EOF
+
+# copy our entrypoint script
+#COPY --chmod=755 docker/entrypoint.sh /bin
 
 # set default Shopware environment variables
 ENV APP_ENV=prod \
@@ -138,6 +171,15 @@ ENV APP_ENV=prod \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
 
+FROM init as dev
+
+# copy all sources
+COPY --link . /app
+WORKDIR /app
+RUN chown -R $PUID:$PGID /app
+USER shopware:shopware
+ENTRYPOINT ["swctl", "run"]
+
 # initialize a clean build stage
 FROM ghcr.io/friendsofshopware/shopware-cli:latest-php-$PHP_VERSION as build
 
@@ -155,9 +197,12 @@ RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
 
 FROM init as final
 
+USER root
 ARG PUID
 ARG PGID
 ARG PORT
+
+RUN rm -rf /app # clean up the dev directory
 
 # add a healthcheck
 # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
@@ -183,5 +228,7 @@ RUN find /var/www/html -type f -exec chmod 644 {} + && \
 WORKDIR /var/www/html
 
 EXPOSE $PORT
+
+USER shopware:shopware
 
 ENTRYPOINT ["swctl", "run"]

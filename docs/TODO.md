@@ -2,15 +2,19 @@
 
 ## ➕ Additions
 
-- [ ] Add [DevTools plugin](https://github.com/shopware/dev-tools) as development dependency
+- [X] Add [DevTools plugin](https://github.com/shopware/dev-tools) as development dependency -> added contained
+  dependencies directly instead
 - [ ] Add [Shopware Analytics](https://store.shopware.com/en/swag541977532977f/shopware-analytics.html) (possibly via
-  Composer)
-- [ ] Add [FroshTools](https://github.com/FriendsOfShopware/FroshTools)
-- [ ] Add [FroshAdminer](https://github.com/FriendsOfShopware/FroshPlatformAdminer)
-- [ ] Add [Admin OAuth Plugin](https://github.com/HEPTACOM/HeptacomShopwarePlatformAdminOpenAuth)
-- [ ] Add [HTML Minifier Plugin](https://github.com/FriendsOfShopware/FroshPlatformHtmlMinify)
+  Composer) -> not possible in 'dev' mode (requires registered shop)
+- [X] Add [FroshTools](https://github.com/FriendsOfShopware/FroshTools)
+- [X] Add ~~[FroshAdminer](https://github.com/FriendsOfShopware/FroshPlatformAdminer)~~ -> decided against
+- [X] Add [Admin OAuth Plugin](https://github.com/HEPTACOM/HeptacomShopwarePlatformAdminOpenAuth) -> will create custom
+  implementation
+- [X] Add [HTML Minifier Plugin](https://github.com/FriendsOfShopware/FroshPlatformHtmlMinify)
 
 ## ✏️ Planned Changes
+
+- [ ] Make Docker image rootless
 
 ## 💡 Ideas
 
