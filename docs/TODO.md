@@ -22,6 +22,7 @@
 - Write a plugin implementing `OAuth2/OIDC`, `SAML`, `LDAP` for the administration and at least `OAuth2/OIDC` for the
   frontend
 - Write a plugin implementing autocomplete for the order process (internationally)
+- Write a plugin implementing the EU VIES API to enable net invoices for business customers
 
 ## 🔗 Links
 
