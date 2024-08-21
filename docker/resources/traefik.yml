@@ -19,7 +19,7 @@ providers:
     filename: /etc/traefik/traefik-dynamic.yml
     watch: true
   docker:
-    defaultRule: Host(`shopware.private`)
+    defaultRule: Host(`shopware.internal`)
     exposedByDefault: false
     network: public
     watch: true

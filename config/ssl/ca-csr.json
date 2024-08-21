@@ -1,5 +1,5 @@
 {
-  "CN": "shopware.private",
+  "CN": "shopware.internal",
   "key": {
     "algo": "ecdsa",
     "size": 256
