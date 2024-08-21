@@ -12,6 +12,9 @@
 
 ## ✏️ Planned Changes
 
+- [ ] Use [GitHub's workflow service containers][github_service_containers] instead of a new
+  [Docker Compose file][ci_compose]
+
 ## 💡 Ideas
 
 - Create the [Helm Chart](https://github.com/fmjstudios/helm) for this repository
@@ -23,3 +26,13 @@
 
 - [GitHub - Awesome Shopware 6](https://github.com/elgentos/awesome-shopware6)
 - [Packagist - Shopware 6 Plugins](https://packagist.org/?query=shopware&type=shopware-platform-plugin)
+
+<!-- INTERNAL REFERENCES -->
+
+<!-- File references -->
+
+[ci_compose]: ../ci/compose.yaml
+
+<!-- General links -->
+
+[github_service_containers]: https://docs.github.com/en/actions/use-cases-and-examples/using-containerized-services/creating-postgresql-service-containers
