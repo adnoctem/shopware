@@ -38,13 +38,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      target: dev
     env_file: .env
     restart: always
     ports:
       - "9161"
     volumes:
-      - ./custom/plugins:/var/www/html/custom/plugins:ro
-      - ./custom/apps:/var/www/html/custom/apps:ro
+      - .:/var/www/html:rw
+      # - ./custom/apps:/var/www/html/custom/apps:ro
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
       - sw-media:/var/www/html/public/media:rw
@@ -66,6 +67,12 @@ services:
       - "traefik.http.services.shopware.loadbalancer.server.port=9161"
       - "traefik.http.services.shopware.loadbalancer.sticky=true"
       - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
+    healthcheck:
+      test: [ "CMD", "curl" ,"--fail", "http://localhost:9161/api/_info/health-check" ]
+      start_period: 3m
+      interval: 1m
+      timeout: 5s
+      retries: 10
     depends_on:
       traefik:
         condition: service_started

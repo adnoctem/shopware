@@ -284,7 +284,7 @@ submodules:
 .PHONY: compose
 compose:
 	$(call log_success, "Starting Docker Compose project")
-	@$(docker) compose -f compose.yaml up -d
+	@$(docker) compose -f compose.yaml up --build -d
 	@sleep 5
 	@$(MAKE) logs APP=shopware
 
