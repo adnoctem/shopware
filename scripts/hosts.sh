@@ -6,17 +6,14 @@
 # Libraries
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-# shellcheck source=scripts/lib/helpers.sh
-. "${SCRIPT_DIR}/lib/helpers.sh"
-
 # shellcheck source=scripts/lib/paths.sh
 . "${SCRIPT_DIR}/lib/paths.sh"
 
-# shellcheck source=scripts/lib/permissions.sh
-. "${SCRIPT_DIR}/lib/permissions.sh"
+# shellcheck source=scripts/lib/perm.sh
+. "${SCRIPT_DIR}/lib/perm.sh"
 
-# shellcheck source=scripts/lib/stdout.sh
-. "${SCRIPT_DIR}/lib/stdout.sh"
+# shellcheck source=scripts/lib/log.sh
+. "${SCRIPT_DIR}/lib/log.sh"
 
 # Constants
 HOST_CONFIG="/etc/hosts"
@@ -30,10 +27,10 @@ ${CONFIG_START}
 # This segment is managed by FMJdev's shopware - do not modify!
 
 # fmjdev/shopware - FMJ Studios Shopware 6
-127.0.0.1               shopware.private                             # Top-Level Domain
-127.0.0.1               traefik.shopware.private                     # Traefik dashboard subdomain
-127.0.0.1               opensearch.shopware.private                  # OpenSearch WebUI
-127.0.0.1               mailpit.shopware.private                     # Mailpit WebUI
+127.0.0.1               shopware.internal                             # Top-Level Domain
+127.0.0.1               traefik.shopware.internal                     # Traefik dashboard subdomain
+127.0.0.1               opensearch.shopware.internal                  # OpenSearch WebUI
+127.0.0.1               mailpit.shopware.internal                     # Mailpit WebUI
 
 ${CONFIG_END}
 EOF
@@ -60,7 +57,7 @@ function hosts::add() {
   case "${choice}" in
   y | Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Installing..."
-    echo "$CONFIG" | lib::permissions::run_as_root tee -a "${HOST_CONFIG}" >/dev/null
+    echo "$CONFIG" | perm::run_as_root tee -a "${HOST_CONFIG}" >/dev/null
     ;;
   *)
     log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
@@ -78,7 +75,7 @@ function hosts::remove() {
   case "${choice}" in
   y | Y)
     log::green "Confirmed modification to ${HOST_CONFIG}. Removing..."
-    lib::permissions::run_as_root sed -i "/${CONFIG_START}/,/${CONFIG_END}/d" ${HOST_CONFIG}
+    perm::run_as_root sed -i "/${CONFIG_START}/,/${CONFIG_END}/d" ${HOST_CONFIG}
     ;;
   *)
     log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
