@@ -141,7 +141,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: submodules bootstrap deps dotenv secrets
+init: submodules bootstrap dotenv deps secrets
 endif
 
 define CI_INFO
@@ -190,6 +190,19 @@ else
 env-cleanup:
 	$(call log_attention, "Stopping Docker Compose project!")
 	@$(docker) compose -f compose.yaml down -v
+endif
+
+define UPDATE_DEPS_INFO
+# Update the Composer dependencies.
+#
+# Update the project's composer dependencies and develpoment dependencies.
+endef
+.PHONY: update-deps
+ifeq ($(PRINT_HELP), y)
+update-deps:
+	echo "$$UPDATE_DEPS_INFO"
+else
+update-deps: update-base-deps update-dev-deps
 endif
 
 define TESTS_INFO
@@ -245,8 +258,6 @@ else
 bundle:
 	tar -cvzf $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
 endif
-
-
 
 # ---------------------------
 #   Secrets
@@ -337,6 +348,17 @@ tests-apps:
 		echo "Running test suite for app: $$app"
 		$(MAKE) -C apps/$$app tests
 	done
+
+# Update dependencies
+.PHONY: update-base-deps
+update-base-deps:
+	$(call log_notice, "Updating dependencies for $(APP)")
+	@composer require $(shell composer show -s --format=json | jq '.requires | keys | map(.+" ") | add' -r)
+
+.PHONY: update-dev-deps
+update-dev-deps:
+	$(call log_notice, "Updating development dependencies for $(APP)")
+	@composer require --dev $(shell composer show -s --format=json | jq '.devRequires | keys | map(.+" ") | add' -r)
 
 # ---------------------------
 # Credentials & Secrets
