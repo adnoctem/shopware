@@ -228,7 +228,7 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-output prune-secrets prune-deps prune-bootstrap prune-compose-network
+prune: prune-output prune-secrets prune-deps prune-bootstrap env-cleanup prune-compose-network
 endif
 
 # ---------------------------
