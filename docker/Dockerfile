@@ -171,29 +171,29 @@ ENV APP_ENV=prod \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
 
-FROM init as dev
-
-# copy all sources
-COPY --link . /app
-WORKDIR /app
-RUN chown -R $PUID:$PGID /app
-USER shopware:shopware
-ENTRYPOINT ["swctl", "run"]
+#FROM init as dev
+#
+## copy all sources
+#COPY --link . /var/www/html
+#WORKDIR /var/www/html
+#RUN chown -R $PUID:$PGID /var/www/html
+#USER shopware:shopware
+#ENTRYPOINT ["swctl", "run"]
 
 # initialize a clean build stage
 FROM ghcr.io/friendsofshopware/shopware-cli:latest-php-$PHP_VERSION as build
 
 # copy all files to to image and delete files which can't be ignored but aren't needed
-COPY --link . /app
-RUN rm -rf /app/docker /app/*compose.yaml
-WORKDIR /app
+COPY --link . /var/www/html
+RUN rm -rf /var/www/html/docker /var/www/html/*compose.yaml
+WORKDIR /var/www/html
 
 # build assets & install dependencies
 # ref: https://sw-cli.fos.gg/commands/project/#shopware-cli-project-ci
 RUN --mount=type=secret,id=composer_auth,dst=/src/auth.json \
     --mount=type=cache,target=/root/.composer \
     --mount=type=cache,target=/root/.npm \
-    shopware-cli project ci /app
+    shopware-cli project ci /var/www/html
 
 FROM init as final
 
@@ -202,14 +202,18 @@ ARG PUID
 ARG PGID
 ARG PORT
 
-RUN rm -rf /app # clean up the dev directory
+RUN rm -rf /var/www/html # clean up the dev directory
+
+USER root
+RUN chown -R shopware:shopware /var/www/html
+WORKDIR /var/www/html
 
 # add a healthcheck
 # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
-HEALTHCHECK --start-period=3m --timeout=5s --interval=1m --retries=10 \
+HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
    CMD curl --fail "http://localhost:${PORT:-9161}/api/_info/health-check" || exit 1
 
-COPY --from=build --chown=$PUID:$PGID --chmod=644 /app /var/www/html
+COPY --from=build --chown=$PUID:$PGID --chmod=644 /var/www/html .
 
 VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
 
@@ -217,15 +221,13 @@ VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/pub
 # ref: https://serverfault.com/a/984599
 RUN <<EOF
 mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/sitemap
-chown -R $PUID:$PGID /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/sitemap
+chown -R shopware:shopware /var/www/html/ /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/sitemap
 EOF
 
 # produce a valid first Nginx config & own files
 RUN find /var/www/html -type f -exec chmod 644 {} + && \
     find /var/www/html -type d -exec chmod 755 {} + && \
-    chown -R $PUID:$PGID /var/www/html
-
-WORKDIR /var/www/html
+    chown -R shopware:shopware .
 
 EXPOSE $PORT
 
