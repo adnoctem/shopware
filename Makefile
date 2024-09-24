@@ -61,7 +61,7 @@ APPS_DIR := $(ROOT_DIR)/custom/apps
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
-DOCKERFILE := $(DOCKER_DIR)/Dockerfile
+DOCKERFILE := $(ROOT_DIR)/Dockerfile
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
 PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
@@ -367,11 +367,11 @@ update-dev-deps:
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv
 dotenv:
-ifeq ($(shell test -e .env && echo -n yes), yes)
-	$(call log_attention, "Skipping generation of .env for Shopware. File exists!")
+ifeq ($(shell test -e .env.local && echo -n yes), yes)
+	$(call log_attention, "Skipping generation of .env.local for Shopware. File exists!")
 else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
-	@cp .env.template .env
+	@cp .env .env.local
 	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
 ifeq ($(CI), y)
