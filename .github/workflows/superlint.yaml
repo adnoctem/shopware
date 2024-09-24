@@ -25,7 +25,7 @@ jobs:
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FILTER_REGEX_EXCLUDE: (bin/|var/)
+          FILTER_REGEX_EXCLUDE: (bin/|var/|vendor/)
           BASH_EXEC_IGNORE_LIBRARIES: true
           VALIDATE_JSCPD: false
           VALIDATE_PHP: false
