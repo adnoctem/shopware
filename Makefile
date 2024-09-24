@@ -134,27 +134,27 @@ define INIT_INFO
 # well as TLS certificates within the $(SECRETS_TLS_DIR) for use with Traefik to enable
 # HTTPS for local development.
 #
-# See the target's prerequesites for information about the commands excuted.
+# See the target's prerequisites for information about the commands executed.
 endef
 .PHONY: init
 ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: submodules bootstrap dotenv deps secrets
+init: bootstrap dotenv deps secrets
 endif
 
 define CI_INFO
 # Initialize the project in CI mode.
 #
-# See the target's prerequesites for information about the commands excuted.
+# See the target's prerequisites for information about the commands executed.
 endef
 .PHONY: ci
 ifeq ($(PRINT_HELP), y)
 ci:
 	echo "$$CI_INFO"
 else
-ci: submodules deps
+ci: deps
 endif
 
 define ENV_INFO
@@ -163,7 +163,7 @@ define ENV_INFO
 # project. Finally the target will follow the Docker logs for the "shopware" container.
 # If the "DESTROY" variable is set it will remove the environment.
 #
-# See the target's prerequesites for information about the commands excuted.
+# See the target's prerequisites for information about the commands executed.
 #
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
@@ -189,32 +189,19 @@ env-cleanup:
 else
 env-cleanup:
 	$(call log_attention, "Stopping Docker Compose project!")
-	@$(docker) compose -f compose.yaml down -v
-endif
-
-define UPDATE_DEPS_INFO
-# Update the Composer dependencies.
-#
-# Update the project's composer dependencies and develpoment dependencies.
-endef
-.PHONY: update-deps
-ifeq ($(PRINT_HELP), y)
-update-deps:
-	echo "$$UPDATE_DEPS_INFO"
-else
-update-deps: update-base-deps update-dev-deps
+	@$(docker) compose -f docker/compose-override.yaml down -v
 endif
 
 define TESTS_INFO
 # Run each plugin or app's custom test suite via sub-makes.
 endef
-.PHONY: tests
-ifeq ($(PRINT_HELP), y)
-tests:
-	echo "$$TESTS_INFO"
-else
-tests: tests-apps tests-plugins
-endif
+#.PHONY: tests
+#ifeq ($(PRINT_HELP), y)
+#tests:
+#	echo "$$TESTS_INFO"
+#else
+#tests:
+#endif
 
 define PRUNE_INFO
 # Remove the local configuration
@@ -243,7 +230,7 @@ ifeq ($(PRINT_HELP), y)
 image:
 	echo "$$IMAGE_INFO"
 else
-image:
+image: buildenv
 	$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
 endif
 
@@ -255,8 +242,9 @@ ifeq ($(PRINT_HELP), y)
 bundle:
 	echo "$$BUNDLE_INFO"
 else
-bundle:
+bundle: output-dir
 	tar -cvzf $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
+	@cd $(OUTPUT_DIR) && sha256sum >> CHECKSUMS_SHA256.txt
 endif
 
 # ---------------------------
@@ -287,15 +275,20 @@ bootstrap:
 	$(call log_success, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
 
-.PHONY: submodules
-submodules:
-	$(call log_success, "Pulling latest changes for all submodules!")
-	@git pull --recurse-submodules --jobs=10
+#.PHONY: submodules
+#submodules:
+#	$(call log_success, "Pulling latest changes for all submodules!")
+#	@git pull --recurse-submodules --jobs=10
+
+.PHONY: buildenv
+buildenv:
+	$(call log_success, "Starting Shopware build environment!")
+	@$(docker) compose -f docker/compose.yaml up -d
 
 .PHONY: compose
 compose:
 	$(call log_success, "Starting Docker Compose project")
-	@$(docker) compose -f compose.yaml up --build -d
+	@$(docker) compose -f docker/compose-override.yaml up -d
 	@sleep 5
 	@$(MAKE) logs APP=shopware
 
@@ -309,56 +302,13 @@ compose-network:
 		public
 
 .PHONY: deps
-deps: deps-plugins deps-apps
-	$(call log_sucess, "Install project Composer dependencies")
-	@composer install
-
-.PHONY: deps-plugins
-.ONESHELL:
-deps-plugins:
-	@for plugin in $(PLUGINS); do
-		echo "Installing dependencies for plugin: $$plugin"
-		$(MAKE) -C custom/plugins/$$plugin deps
-	done
-
-.PHONY: deps-apps
-.ONESHELL:
-deps-apps:
-	@for app in $(APPS); do
-		echo "Installing dependencies for app: $$app"
-		$(MAKE) -C apps/$$app deps
-	done
+deps:
+	$(call log_success, "Install project Composer dependencies")
+	@composer install --ignore-platform-reqs --no-interaction
 
 .PHONY: logs
 logs:
 	@$(docker) logs -f $(shell docker ps -aq -f 'label=application=$(APP)')
-
-.PHONY: tests-plugins
-.ONESHELL:
-tests-plugins:
-	@for plugin in $(PLUGINS); do
-		echo "Running test suite for plugin: $$plugin"
-		$(MAKE) -C custom/plugins/$$plugin tests
-	done
-
-.PHONY: tests-apps
-.ONESHELL:
-tests-apps:
-	@for app in $(APPS); do
-		echo "Running test suite for app: $$app"
-		$(MAKE) -C apps/$$app tests
-	done
-
-# Update dependencies
-.PHONY: update-base-deps
-update-base-deps:
-	$(call log_notice, "Updating dependencies for $(APP)")
-	@composer require $(shell composer show -s --format=json | jq '.requires | keys | map(.+" ") | add' -r)
-
-.PHONY: update-dev-deps
-update-dev-deps:
-	$(call log_notice, "Updating development dependencies for $(APP)")
-	@composer require --dev $(shell composer show -s --format=json | jq '.devRequires | keys | map(.+" ") | add' -r)
 
 # ---------------------------
 # Credentials & Secrets
@@ -372,13 +322,13 @@ ifeq ($(shell test -e .env.local && echo -n yes), yes)
 else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
 	@cp .env .env.local
-	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env
-	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env.local
+	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env.local
 ifeq ($(CI), y)
 	$(call log_notice, "Updating .env for Shopware CI")
-	@sed -i -e "s/DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware/DATABASE_URL=mysql://shopware:shopware@loca:3306/shopware/g" .env
-	@sed -i -e "s/OPENSEARCH_URL=http://opensearch:9200/OPENSEARCH_URL=http://localhost:9200/g" .env
-	@sed -i -e "s/MAILER_DSN=smtp://shopware:shopware@mailpit:1025/MAILER_DSN=smtp://shopware:shopware@localhost:8025/g" .env
+	@sed -i -e "s/DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware/DATABASE_URL=mysql://shopware:shopware@loca:3306/shopware/g" .env.local
+	@sed -i -e "s/OPENSEARCH_URL=http://opensearch:9200/OPENSEARCH_URL=http://localhost:9200/g" .env.local
+	@sed -i -e "s/MAILER_DSN=smtp://shopware:shopware@mailpit:1025/MAILER_DSN=smtp://shopware:shopware@localhost:8025/g" .env.local
 endif
 endif
 
@@ -432,7 +382,7 @@ output-dir:
 .PHONY: prune-env
 prune-env:
 	$(call log_success, "Removing assets created by Docker Compose!")
-	@$(docker) compose -f compose.yaml down -v
+	@$(docker) compose -f docker/compose-override.yaml down -v
 
 .PHONY: prune-bootstrap
 prune-bootstrap:
@@ -443,6 +393,11 @@ prune-bootstrap:
 prune-compose-network:
 	$(call log_success, "Removing public Docker Compose network!")
 	@$(docker) network rm public --force
+
+.PHONY: prune-buildenv
+prune-buildenv:
+	$(call log_success, "Removing Shopware build environment!")
+	@$(docker) compose -f docker/compose.yaml down -v
 
 .PHONY: prune-secrets
 prune-secrets:
