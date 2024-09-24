@@ -11,7 +11,8 @@
     "shopware/core": "^6.6",
     "shopware/elasticsearch": "^6.6",
     "shopware/storefront": "^6.6",
-    "symfony/flex": "^2.4"
+    "symfony/flex": "^2.4",
+    "ext-opentelemetry": "*"
   },
   "repositories": [
     {
