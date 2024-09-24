@@ -33,7 +33,9 @@ ARG PORT=9161
 RUN apk add --no-cache \
     nginx=~1.26 \
     supervisor=~4.2 \
-    jq=~1.7
+    jq=~1.7 \
+    trurl \
+    envsubst
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 # install Shopware required PHP extensions and the latest version of Composer
@@ -130,7 +132,7 @@ ENV APP_ENV=prod \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
     MAILER_DSN=null://null \
-    DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware \
+    DATABASE_URL=mysql://shopware:shopware@127.0.0.1:3306/shopware \
     OPENSEARCH_URL="" \
     BLUE_GREEN_DEPLOYMENT=0 \
     SHOPWARE_ES_ENABLED=0 \
@@ -173,24 +175,28 @@ FROM base as build
 
 # copy all sources
 WORKDIR /var/www/html
-VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
 COPY --link --chown=${USER}:${GROUP} . ./
 USER ${USER}:${GROUP}
 
 # (re)-own files and directories
 RUN find /var/www/html -type f -exec chmod 644 {} + && \
     find /var/www/html -type d -exec chmod 755 {} + && \
-    chown -R shopware:shopware ./
+    chown -R ${USER}:${GROUP} ./
 
 # build assets & install dependencies
 # ref: https://sw-cli.fos.gg/commands/project/#shopware-cli-project-ci
-RUN --mount=type=secret,id=composer_auth,dst=/auth.json \
+RUN --mount=type=secret,id=composer_auth,dst=/home/${USER}/auth.json \
     --mount=type=cache,target=/home/${USER}/.composer \
     --mount=type=cache,target=/home/${USER}/.npm \
     shopware-cli project ci .
 
+# (re-)set 'dev' as default ENV
+ENV APP_ENV=dev
+
 FROM base as final
 
-USER ${USER}:${GROUP}
+WORKDIR /var/www/html
+VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
 COPY --from=build --chown=${USER}:${GROUP} /var/www/html ./
+USER ${USER}:${GROUP}
 ENTRYPOINT ["swctl", "run"]
