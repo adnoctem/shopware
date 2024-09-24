@@ -6,33 +6,34 @@
          backupGlobals="false"
          colors="true"
          bootstrap="tests/bootstrap.php"
-         convertDeprecationsToExceptions="false"
+         failOnDeprecation="false"
+         cacheResult="true"
+         cacheDirectory=".phpunit.cache"
+         executionOrder="random"
 >
     <php>
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
-        <server name="APP_ENV" value="test" force="true" />
-        <server name="SHELL_VERBOSITY" value="-1" />
+        <env name="APP_ENV" value="test" force="true" />
+        <env name="APP_DEBUG" value="1"/>
+        <env name="APP_SECRET" value="3T2YM0PgkJ50Nheje5amNKoTSpMA42bpsHehKRWM6p4Gc9jT3AAflsTF7TwRE0QY%"/>
+        <env name="SHOPWARE_HTTP_CACHE_ENABLED" value="0"/>
+        <env name="SHELL_VERBOSITY" value="-1" />
         <server name="SYMFONY_PHPUNIT_REMOVE" value="" />
         <server name="SYMFONY_PHPUNIT_VERSION" value="9.5" />
+        <server name="TESTS_RUNNING" value="1"/>
+        <server name="MAILER_URL" value="null://localhost"/>
+        <server name="HTTPS" value="off"/>
+        <!--To see the full stackTrace of a Deprecation set the value to a regex matching the deprecation warning-->
+        <!--https://symfony.com/doc/current/components/phpunit_bridge.html#display-the-full-stack-trace-->
+        <env name="SYMFONY_DEPRECATIONS_HELPER" value="ignoreFile=./deprecation.ignore" />
     </php>
+
+    <coverage includeUncoveredFiles="true"/>
 
     <testsuites>
         <testsuite name="Project Test Suite">
             <directory>tests</directory>
         </testsuite>
     </testsuites>
-
-    <coverage processUncoveredFiles="true">
-        <include>
-            <directory suffix=".php">src</directory>
-        </include>
-    </coverage>
-
-    <listeners>
-        <listener class="Symfony\Bridge\PhpUnit\SymfonyTestsListener" />
-    </listeners>
-
-    <extensions>
-    </extensions>
 </phpunit>
