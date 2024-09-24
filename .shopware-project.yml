@@ -1,0 +1,15 @@
+# FMJ Studios Shopware
+# .shopware-project.yml configures the Shopware-CLI
+# ref: https://sw-cli.fos.gg/shopware-project-yml-schema/
+
+url: "shop.beta.fmj.studio"
+admin_api:
+  # force use of an integration - source values from environment
+  client_id: ${SHOPWARE_CLIENT_ID}
+  client_secret: ${SHOPWARE_CLIENT_SECRET}
+  disable_ssl_check: false
+build:
+  remove_extension_assets: true
+  disable_asset_copy: false
+  keep_source_maps: false
+  browserslist: 'cover 99.5%, >= 0.5% and not dead, last 2 versions'
