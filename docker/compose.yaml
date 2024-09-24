@@ -15,7 +15,7 @@ services:
     labels:
       - "application=mysql"
     healthcheck:
-      test: [ "CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1", "-ushopware", "-p${MYSQL_ROOT_PASSWORD:-shopware}" ]
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-shopware}" ]
       interval: 5s
       timeout: 5s
       retries: 20

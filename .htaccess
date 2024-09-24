@@ -11,4 +11,3 @@ DirectoryIndex index.html index.php
     # Restrict access to root folder files
     RedirectMatch 404 /(composer\.(json|lock|phar)|README\.md|\.gitignore|.*\.dist|\.env.*)$
 </IfModule>
-

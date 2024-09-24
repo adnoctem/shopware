@@ -13,7 +13,7 @@ Before running _any_ other target you should run the `tools-check` target which 
 to operate the project locally. If any of the required executables are not found the `make` will let you know.
 
 After you have all the necessary tools installed you will want to generate the TLS certificates for use with Traefik to
-ensure TLS connections during local devlopment. To this you can run:
+ensure TLS connections during local development. To this you can run:
 
 ```shell
 make secrets
