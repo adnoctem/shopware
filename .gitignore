@@ -2,12 +2,14 @@
 /.idea
 # deps
 /vendor/
+*.txt
 
 ###> shopware/core ###
 # env config
-.env*
+.env.*
 .*env
-!.env.template
+.env*
+!.env
 
 # ephemeral files
 /public/bundles/*
