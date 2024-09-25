@@ -23,8 +23,8 @@ LABEL org.opencontainers.base.name="ghcr.io/fmjstudios/shopware:latest" \
 
 # container settings
 ARG PHP_VERSION
-ARG USER=shopware
-ARG GROUP=shopware
+ARG USER=www-data
+ARG GROUP=www-data
 ARG PUID=1001
 ARG PGID=1001
 ARG PORT=9161
@@ -89,35 +89,35 @@ ENV PUID=${PUID} \
     PHP_FPM_LOG_LIMIT=8192
 
 # crate user and group
-RUN <<EOF
-adduser --system --uid ${PUID} ${USER}
-addgroup --system --gid ${PGID} ${GROUP}
-EOF
+#RUN <<EOF
+#adduser --system --uid ${PUID} ${USER}
+#addgroup --system --gid ${PGID} ${GROUP}
+#EOF
 
 # configure PHP
 RUN rm -rf /usr/local/etc/php/php.ini*
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/php/docker-php.ini /usr/local/etc/php/conf.d
+COPY --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
+COPY --chmod=644 docker/conf/php/docker-php.ini /usr/local/etc/php/conf.d
 
 # configure PHP-FPM
 RUN rm -rf /usr/local/etc/php-fpm.d/* && \
     rm -rf /usr/local/etc/php-fpm.conf*
 
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/php-fpm/php-fpm.conf /usr/local/etc
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/php-fpm/www.conf /usr/local/etc/php-fpm.d
+COPY --chmod=644 docker/conf/php-fpm/php-fpm.conf /usr/local/etc
+COPY --chmod=644 docker/conf/php-fpm/www.conf /usr/local/etc/php-fpm.d
 
 # configure Nginx
 RUN rm -rf /etc/nginx/http.d/*.conf
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
+COPY --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
+COPY --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
 
 # configure Supervisor
 RUN mkdir -p /etc/supervisor /etc/supervisor/conf.d
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
+COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
 
 # add container executables and library scripts
-COPY --chown=${USER}:${GROUP} --chmod=755 docker/bin/swctl /usr/local/bin
-COPY --chown=${USER}:${GROUP} --chmod=644 docker/lib/utils.sh /usr/local/lib
+COPY --chmod=755 docker/bin/swctl /usr/local/bin
+COPY --chmod=644 docker/lib/utils.sh /usr/local/lib
 
 # create and own directories required by services
 RUN <<EOF
@@ -132,7 +132,7 @@ ENV APP_ENV=prod \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
     MAILER_DSN=null://null \
-    DATABASE_URL=mysql://shopware:shopware@127.0.0.1:3306/shopware \
+    DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware \
     OPENSEARCH_URL="" \
     BLUE_GREEN_DEPLOYMENT=0 \
     SHOPWARE_ES_ENABLED=0 \
@@ -144,8 +144,9 @@ ENV APP_ENV=prod \
     SHOPWARE_CACHE_ID=docker \
     SHOPWARE_SKIP_WEBINSTALLER=1 \
     COMPOSER_PLUGIN_LOADER=1 \
-    COMPOSER_HOME="/tmp/composer" \
+    COMPOSER_HOME="/var/www/html/var/cache/composer" \
     OTEL_PHP_AUTOLOAD_ENABLED=false \
+    OTEL_PHP_DISABLED_INSTRUMENTATIONS=shopware \
     OTEL_SERVICE_NAME=shopware \
     OTEL_TRACES_EXPORTER=otlp \
     OTEL_LOGS_EXPORTER=otlp \
@@ -158,13 +159,13 @@ ENV APP_ENV=prod \
     INSTALL_ADMIN_PASSWORD=shopware
 
 # install Shopware-CLI
-RUN curl -sSLf \
-        -o /tmp/shopware-cli.tar.gz \
-        https://github.com/FriendsOfShopware/shopware-cli/releases/download/0.4.54/shopware-cli_Linux_x86_64.tar.gz && \
-    mkdir -p /tmp/shopware-cli && \
-    tar xzvf /tmp/shopware-cli.tar.gz -C /tmp/shopware-cli && \
-    chmod +x /tmp/shopware-cli/shopware-cli && \
-    mv /tmp/shopware-cli/shopware-cli /usr/local/bin/shopware-cli
+#RUN curl -sSLf \
+#        -o /tmp/shopware-cli.tar.gz \
+#        https://github.com/FriendsOfShopware/shopware-cli/releases/download/0.4.54/shopware-cli_Linux_x86_64.tar.gz && \
+#    mkdir -p /tmp/shopware-cli && \
+#    tar xzvf /tmp/shopware-cli.tar.gz -C /tmp/shopware-cli && \
+#    chmod +x /tmp/shopware-cli/shopware-cli && \
+#    mv /tmp/shopware-cli/shopware-cli /usr/local/bin/shopware-cli
 
 # add a healthcheck
 # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
@@ -176,22 +177,21 @@ FROM base as build
 # copy all sources
 WORKDIR /var/www/html
 COPY --link --chown=${USER}:${GROUP} . ./
-USER ${USER}:${GROUP}
 
 # (re)-own files and directories
-RUN find /var/www/html -type f -exec chmod 644 {} + && \
-    find /var/www/html -type d -exec chmod 755 {} + && \
-    chown -R ${USER}:${GROUP} ./
+#RUN find . -type f -not -path /var/www/html/bin -exec chmod 644 {} + && \
+#    find . -type d -exec chmod 755 {} + && \
+
+RUN chown -R ${USER}:${GROUP} .
+RUN rm -rf ./docker # remove non-ignorable docker dir
 
 # build assets & install dependencies
 # ref: https://sw-cli.fos.gg/commands/project/#shopware-cli-project-ci
+USER ${USER}:${GROUP}
 RUN --mount=type=secret,id=composer_auth,dst=/home/${USER}/auth.json \
     --mount=type=cache,target=/home/${USER}/.composer \
     --mount=type=cache,target=/home/${USER}/.npm \
-    shopware-cli project ci .
-
-# (re-)set 'dev' as default ENV
-ENV APP_ENV=dev
+    CI=1 bin/build-js.sh
 
 FROM base as final
 

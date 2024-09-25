@@ -71,6 +71,90 @@ services:
     labels:
       - "application=mailpit"
 
+  # Jaeger
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: jeager
+    restart: always
+    ports:
+      - "16686:16686"
+      - "14268"
+      - "14250"
+
+  # Zipkin
+  #  zipkin:
+  #    image: openzipkin/zipkin:latest
+  #    container_name: zipkin
+  #    environment:
+  #      - JAVA_OPTS=-Xms1024m -Xmx1024m -XX:+ExitOnOutOfMemoryError
+  #    restart: always
+  #    ports:
+  #      - "9411:9411"
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    restart: unless-stopped
+    environment:
+      - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource"
+    configs:
+      - source: grafana.ini
+        target: /etc/grafana/grafana.ini
+    ports:
+      - "3000:3000"
+
+  # Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: otel-collector
+    restart: always
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    configs:
+      - source: otel-collector-config.yaml
+        target: /etc/otel-collector-config.yaml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OTLP gRPC receiver
+      - "55679:55679" # zpages extension
+    depends_on:
+      - jaeger
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.54.1
+    restart: always
+    configs:
+      - source: otel-collector-config.yaml
+        target: /etc/prometheus/prometheus.yml
+    command:
+      - --web.console.templates=/etc/prometheus/consoles
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --storage.tsdb.retention.time=1h
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+      - --web.route-prefix=/
+      - --enable-feature=exemplar-storage
+      - --enable-feature=otlp-write-receiver
+    ports:
+      - "9090:9090"
+
 volumes:
   db-data:
   opensearch-data:
+
+configs:
+  grafana.ini:
+    file: resources/grafana.ini
+  otel-collector-config.yaml:
+    file: resources/otel-collector-config.yaml
+  prometheus.yaml:
+    file: resources/prometheus.yaml
