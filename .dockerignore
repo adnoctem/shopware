@@ -13,10 +13,11 @@ Dockerfile
 docker/resources
 docker/compose.yaml
 docker/compose-override.yaml.yaml
-config/k8s
-config/ssl
+/config/k8s
+/config/ssl
 README.md
 LICENSE
-secrets
-docs
-vendor
+/secrets
+/docs
+/vendor
+.shopware*.yml

@@ -64,16 +64,23 @@ GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
 DOCKERFILE := $(ROOT_DIR)/Dockerfile
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
+TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./scripts' --exclude='./.github'
+PHP_EXTENSIONS := +default +gd +intl +iconv +sodium +pdo +mysql
 PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
 APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 
 COMPOSE_SUBNET := 172.25.0.0/16
 COMPOSE_GATEWAY_IP := 172.25.0.1
 
+# PHP
+PHP := $(strip $(shell phpbrew list | grep -Eo 'php-$(PHP_VERSION).?[0-9]+'))
+
 # general variables
 DATE := $(shell date '+%d.%m.%y-%T')
-VERSION := $(shell composer show --self | grep 'versions' | grep -o -E '\*\s.+' | cut -d' ' -f 2)
+GIT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null)
+VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo v0.1.0)))
 NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
+
 
 # Executables
 docker := docker
@@ -82,17 +89,19 @@ composer := composer
 kind := kind # to be used later
 node := node
 cfssl := cfssl
+pre-commit := pre-commit
+phpbrew := phpbrew
 
-EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl)
+EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commit) $(phpbrew)
 
 # ---------------------------
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
-TAG ?= v$(VERSION)
-STOP ?= n
+TAG ?= $(VERSION)
 APP ?= shopware
 CI ?= n
+PHP_VERSION ?= 8.2
 
 # ---------------------------
 # Custom functions
@@ -141,7 +150,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: bootstrap dotenv deps secrets
+init: dotenv deps secrets
 endif
 
 define CI_INFO
@@ -154,7 +163,7 @@ ifeq ($(PRINT_HELP), y)
 ci:
 	echo "$$CI_INFO"
 else
-ci: deps
+ci: dotenv deps
 endif
 
 define ENV_INFO
@@ -173,7 +182,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose-network compose
+env: bootstrap compose-network compose
 endif
 
 define ENV_CLEANUP_INFO
@@ -187,9 +196,7 @@ ifeq ($(PRINT_HELP), y)
 env-cleanup:
 	echo "$$ENV_CLEANUP_INFO"
 else
-env-cleanup:
-	$(call log_attention, "Stopping Docker Compose project!")
-	@$(docker) compose -f docker/compose-override.yaml down -v
+env-cleanup: prune-compose prune-compose-network prune-bootstrap
 endif
 
 define TESTS_INFO
@@ -215,7 +222,7 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-output prune-secrets prune-deps prune-bootstrap env-cleanup prune-compose-network
+prune: prune-output prune-secrets prune-deps prune-bootstrap prune-compose prune-compose-network
 endif
 
 # ---------------------------
@@ -231,7 +238,9 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image: buildenv
-	$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
+	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
+	@$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
+	$(MAKE) prune-buildenv
 endif
 
 define BUNDLE_INFO
@@ -243,7 +252,8 @@ bundle:
 	echo "$$BUNDLE_INFO"
 else
 bundle: output-dir
-	tar -cvzf $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
+	$(call log_notice, "Building a Tarball bundle of $(APP)!")
+	@tar -cvzf $(TAR_EXCLUDE_FLAGS) $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
 	@cd $(OUTPUT_DIR) && sha256sum >> CHECKSUMS_SHA256.txt
 endif
 
@@ -268,26 +278,33 @@ endif
 # ---------------------------
 #   Dependencies
 # ---------------------------
+.PHONY: php
+php:
+	$(call log_notice, "Installing PHP version: $(PHP_VERSION)")
+	$(call log_notice, "Got PHP: $(PHP) - WTF is going on")
+ifeq ($(PHP),)
+	$(call log_notice, "Building custom PHP: $(PHP_VERSION)")
+	@phpbrew install -j $(shell nproc) $(PHP_VERSION) $(PHP_EXTENSIONS)
+else
+	$(call log_notice, "Switching PHP to $(PHP)")
+	@phpbrew use $(PHP)
+	@phpbrew switch $(PHP)
+endif
 
 # setup
 .PHONY: bootstrap
 bootstrap:
-	$(call log_success, "Bootstrapping host machine DNS entries!")
+	$(call log_notice, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
-
-#.PHONY: submodules
-#submodules:
-#	$(call log_success, "Pulling latest changes for all submodules!")
-#	@git pull --recurse-submodules --jobs=10
 
 .PHONY: buildenv
 buildenv:
-	$(call log_success, "Starting Shopware build environment!")
+	$(call log_notice, "Starting Shopware build environment!")
 	@$(docker) compose -f docker/compose.yaml up -d
 
 .PHONY: compose
 compose:
-	$(call log_success, "Starting Docker Compose project")
+	$(call log_notice, "Starting Docker Compose project")
 	@$(docker) compose -f docker/compose-override.yaml up -d
 	@sleep 5
 	@$(MAKE) logs APP=shopware
@@ -303,11 +320,17 @@ compose-network:
 
 .PHONY: deps
 deps:
-	$(call log_success, "Install project Composer dependencies")
+	$(call log_notice, "Installing project Composer dependencies")
 	@composer install --ignore-platform-reqs --no-interaction
+
+.PHONY: pre-commit
+pre-commit:
+	$(call log_notice, "Installing project Pre-Commit dependencies")
+	@pre-commit install
 
 .PHONY: logs
 logs:
+	$(call log_notice, "Streaming Docker container logs for $(APP)")
 	@$(docker) logs -f $(shell docker ps -aq -f 'label=application=$(APP)')
 
 # ---------------------------
@@ -379,39 +402,39 @@ output-dir:
 # Housekeeping
 # ---------------------------
 
-.PHONY: prune-env
-prune-env:
-	$(call log_success, "Removing assets created by Docker Compose!")
-	@$(docker) compose -f docker/compose-override.yaml down -v
-
 .PHONY: prune-bootstrap
 prune-bootstrap:
-	$(call log_success, "Removing local bootstrapping files!")
+	$(call log_attention, "Removing hostnames from /etc/hosts!")
 	@$(SCRIPT_DIR)/hosts.sh remove
+
+.PHONY: prune-compose
+prune-compose:
+	$(call log_attention, "Stopping Docker Compose project!")
+	@$(docker) compose -f docker/compose-override.yaml down -v
 
 .PHONY: prune-compose-network
 prune-compose-network:
-	$(call log_success, "Removing public Docker Compose network!")
+	$(call log_attention, "Removing public Docker Compose network!")
 	@$(docker) network rm public --force
 
 .PHONY: prune-buildenv
 prune-buildenv:
-	$(call log_success, "Removing Shopware build environment!")
+	$(call log_attention, "Removing Shopware build environment!")
 	@$(docker) compose -f docker/compose.yaml down -v
 
 .PHONY: prune-secrets
 prune-secrets:
-	$(call log_success, "Removing local secrets in $(SECRETS_DIR)!")
+	$(call log_attention, "Removing secrets in $(SECRETS_DIR)!")
 	rm -rf $(SECRETS_DIR)
 
 .PHONY: prune-output
 prune-output:
-	$(call log_success, "Removing local distributables in $(OUTPUT_DIR)!")
+	$(call log_attention, "Removing distributables in $(OUTPUT_DIR)!")
 	rm -rf $(OUTPUT_DIR)
 
 .PHONY: prune-deps
 prune-deps:
-	$(call log_success, "Removing local dependencies in $(DEPENDENCY_DIR)!")
+	$(call log_attention, "Removing Shopware dependencies in $(DEPENDENCY_DIR)!")
 	rm -rf $(DEPENDENCY_DIR)
 
 # ---------------------------
@@ -427,6 +450,7 @@ name:
 
 .PHONY: tools-check
 tools-check:
+	$(call log_notice, "Running 'tools-check' for $(APP)")
 	$(foreach exe,$(EXECUTABLES), $(if $(shell command -v $(exe) 2> /dev/null), $(info Found $(exe)), $(info Please install $(exe))))
 
 # ---------------------------

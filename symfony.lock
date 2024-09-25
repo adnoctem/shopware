@@ -102,6 +102,18 @@
             "config/packages/elasticsearch.yaml"
         ]
     },
+    "shopware/opentelemetry": {
+        "version": "0.1",
+        "recipe": {
+            "repo": "github.com/shopware/recipes",
+            "branch": "main",
+            "version": "0.1",
+            "ref": "1c9557f01456b832b4126ed2a08de92d998f84ed"
+        },
+        "files": [
+            "config/packages/prod/opentelemetry.yaml"
+        ]
+    },
     "shopware/storefront": {
         "version": "6.6",
         "recipe": {

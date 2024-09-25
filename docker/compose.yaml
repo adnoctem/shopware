@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:${MYSQL_VERSION:-8}-oracle
+    image: mysql:${MYSQL_VERSION:-8.0}-oracle
     container_name: mysql
     restart: always
     ports:
