@@ -52,6 +52,8 @@ OUTPUT_DIR := $(ROOT_DIR)/dist
 SECRETS_DIR := $(ROOT_DIR)/secrets
 SECRETS_TLS_DIR := $(ROOT_DIR)/secrets/ssl
 DEPENDENCY_DIR := $(ROOT_DIR)/vendor
+VAR_DIR := $(ROOT_DIR)/var
+PUBLIC_DIR := $(ROOT_DIR)/public
 DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
 CI_LINTER_DIR := $(CI_DIR)/linters
@@ -72,15 +74,11 @@ APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 COMPOSE_SUBNET := 172.25.0.0/16
 COMPOSE_GATEWAY_IP := 172.25.0.1
 
-# PHP
-PHP := $(strip $(shell phpbrew list | grep -Eo 'php-$(PHP_VERSION).?[0-9]+'))
-
 # general variables
 DATE := $(shell date '+%d.%m.%y-%T')
 GIT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null)
 VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo v0.1.0)))
 NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
-
 
 # Executables
 docker := docker
@@ -90,9 +88,8 @@ kind := kind # to be used later
 node := node
 cfssl := cfssl
 pre-commit := pre-commit
-phpbrew := phpbrew
 
-EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commit) $(phpbrew)
+EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commit)
 
 # ---------------------------
 # User-defined variables
@@ -101,7 +98,6 @@ PRINT_HELP ?=
 TAG ?= $(VERSION)
 APP ?= shopware
 CI ?= n
-PHP_VERSION ?= 8.2
 
 # ---------------------------
 # Custom functions
@@ -150,7 +146,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: dotenv deps secrets
+init: dotenv buildenv deps secrets compose-network
 endif
 
 define CI_INFO
@@ -182,7 +178,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: bootstrap compose-network compose
+env: bootstrap compose
 endif
 
 define ENV_CLEANUP_INFO
@@ -222,7 +218,7 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-output prune-secrets prune-deps prune-bootstrap prune-compose prune-compose-network
+prune: prune-output prune-secrets prune-deps prune-var prune-public prune-install prune-bootstrap prune-compose prune-compose-network prune-buildenv
 endif
 
 # ---------------------------
@@ -237,10 +233,9 @@ ifeq ($(PRINT_HELP), y)
 image:
 	echo "$$IMAGE_INFO"
 else
-image: buildenv
+image:
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
-	@$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
-	$(MAKE) prune-buildenv
+	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
 endif
 
 define BUNDLE_INFO
@@ -278,19 +273,6 @@ endif
 # ---------------------------
 #   Dependencies
 # ---------------------------
-.PHONY: php
-php:
-	$(call log_notice, "Installing PHP version: $(PHP_VERSION)")
-	$(call log_notice, "Got PHP: $(PHP) - WTF is going on")
-ifeq ($(PHP),)
-	$(call log_notice, "Building custom PHP: $(PHP_VERSION)")
-	@phpbrew install -j $(shell nproc) $(PHP_VERSION) $(PHP_EXTENSIONS)
-else
-	$(call log_notice, "Switching PHP to $(PHP)")
-	@phpbrew use $(PHP)
-	@phpbrew switch $(PHP)
-endif
-
 # setup
 .PHONY: bootstrap
 bootstrap:
@@ -301,6 +283,18 @@ bootstrap:
 buildenv:
 	$(call log_notice, "Starting Shopware build environment!")
 	@$(docker) compose -f docker/compose.yaml up -d
+
+.PHONY: symfony-start
+symfony-start: buildenv
+	$(call log_notice, "Starting Shopware on local Symfony development server!")
+	@symfony server:start -d --no-tls
+	@symfony server:log
+
+.PHONY: symfony-stop
+symfony-stop:
+	$(call log_notice, "Stopping Shopware on local Symfony development server!")
+	@symfony server:stop
+	$(MAKE) prune-buildenv
 
 .PHONY: compose
 compose:
@@ -321,7 +315,7 @@ compose-network:
 .PHONY: deps
 deps:
 	$(call log_notice, "Installing project Composer dependencies")
-	@composer install --ignore-platform-reqs --no-interaction
+	@composer install --no-interaction
 
 .PHONY: pre-commit
 pre-commit:
@@ -345,7 +339,7 @@ ifeq ($(shell test -e .env.local && echo -n yes), yes)
 else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
 	@cp .env .env.local
-	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48)/g" .env.local
+	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env.local
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env.local
 ifeq ($(CI), y)
 	$(call log_notice, "Updating .env for Shopware CI")
@@ -436,6 +430,26 @@ prune-output:
 prune-deps:
 	$(call log_attention, "Removing Shopware dependencies in $(DEPENDENCY_DIR)!")
 	rm -rf $(DEPENDENCY_DIR)
+
+.PHONY: prune-var
+prune-var:
+	$(call log_attention, "Cleaning up Shopware var directory in $(VAR_DIR)!")
+	rm -rf $(VAR_DIR)/cache/*
+	rm -rf $(VAR_DIR)/log/*
+
+.PHONY: prune-public
+prune-public:
+	$(call log_attention, "Cleaning up Shopware public directory in $(PUBLIC_DIR)!")
+	rm -rf $(PUBLIC_DIR)/bundles/*
+	rm -rf $(PUBLIC_DIR)/media/*
+	rm -rf $(PUBLIC_DIR)/theme/*
+	rm -rf $(PUBLIC_DIR)/thumbnail/*
+	rm -rf $(PUBLIC_DIR)/sitemap/*
+
+.PHONY: prune-install
+prune-install:
+	$(call log_attention, "Removing Shopware\'s install.lock!")
+	rm -rf $(ROOT_DIR)/install.lock
 
 # ---------------------------
 # Checks
