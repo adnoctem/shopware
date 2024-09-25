@@ -2,17 +2,21 @@
 # .shopware-project.yml configures the Shopware-CLI
 # ref: https://sw-cli.fos.gg/shopware-project-yml-schema/
 
-url: "https://shop.beta.fmj.studio"
-admin_api:
-  # force use of an integration in production - source values from environment
-  client_id: ${SHOPWARE_CLIENT_ID}
-  client_secret: ${SHOPWARE_CLIENT_SECRET}
-  # developer may use the username/password login
-  username: ${SHOPWARE_USERNAME}
-  password: ${SHOPWARE_PASSWORD}
-  disable_ssl_check: false
+url: "http://localhost"
+#admin_api:
+#  # force use of an integration in production - source values from environment
+#  client_id: ${SHOPWARE_CLIENT_ID}
+#  client_secret: ${SHOPWARE_CLIENT_SECRET}
+#  # developer may use the username/password login
+#  username: ${SHOPWARE_USERNAME}
+#  password: ${SHOPWARE_PASSWORD}
+#  disable_ssl_check: false
 build:
   remove_extension_assets: true
   disable_asset_copy: false
   keep_source_maps: false
   browserslist: 'cover 99.5%, >= 0.5% and not dead, last 2 versions'
+#sync:
+#  config:
+#    - settings:
+#        SwagPayPal.settings.sandbox: true
