@@ -4,7 +4,8 @@
     "shopware.internal",
     "traefik.shopware.internal",
     "opensearch.shopware.internal",
-    "mailpit.shopware.internal"
+    "mailpit.shopware.internal",
+    "phpmyadmin.shopware.internal"
   ],
   "key": {
     "algo": "ecdsa",

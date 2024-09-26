@@ -146,7 +146,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: dotenv deps secrets compose-network
+init: deps secrets compose-network
 endif
 
 define CI_INFO
@@ -159,7 +159,7 @@ ifeq ($(PRINT_HELP), y)
 ci:
 	echo "$$CI_INFO"
 else
-ci: dotenv deps
+ci: deps
 endif
 
 define ENV_INFO
@@ -178,7 +178,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: bootstrap compose
+env: dotenv bootstrap compose-network compose
 endif
 
 define ENV_CLEANUP_INFO
@@ -218,7 +218,7 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-output prune-secrets prune-deps prune-var prune-public prune-install prune-bootstrap prune-compose prune-compose-network prune-buildenv
+prune: prune-bootstrap prune-compose prune-compose-network prune-files
 endif
 
 # ---------------------------
@@ -268,6 +268,10 @@ secrets:
 	echo "$$SECRETS_INFO"
 else
 secrets: secrets-dir secrets-gen-ca secrets-gen-server
+ifeq ($(shell test -e /tmp/sw-backup.sql && echo -n yes ), yes)
+	$(call log_attention, "Found Shopware backup.sql in /tmp! Importing into secrets...")
+	@mv /tmp/sw-backup.sql $(SECRETS_DIR)/backup.sql
+endif
 endif
 
 # ---------------------------
@@ -279,14 +283,22 @@ bootstrap:
 	$(call log_notice, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
 
-.PHONY: buildenv
-buildenv:
-	$(call log_notice, "Starting Shopware build environment!")
-	@$(docker) compose -f docker/compose.yaml up -d
+#.PHONY: buildenv
+#buildenv:
+#	$(call log_notice, "Starting Shopware build environment!")
+#	@$(docker) compose -f docker/compose.yaml up -d
+
+.PHONY: dumps
+dumps:
+	$(call log_notice, "Dumping Shopware\'s static build information")
+	php bin/console theme:dump
+	php bin/console feature:dump
+	php bin/console bundle:dump
 
 .PHONY: start
-start: buildenv
+start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
+	@$(docker) compose -f docker/compose.yaml up -d
 	@symfony server:start -d --no-tls
 	@symfony server:log
 
@@ -294,7 +306,8 @@ start: buildenv
 stop:
 	$(call log_notice, "Stopping Shopware on local Symfony development server!")
 	@symfony server:stop
-	$(MAKE) prune-buildenv
+	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
+	@$(docker) compose -f docker/compose.yaml down -v
 
 .PHONY: compose
 compose:
@@ -335,19 +348,20 @@ logs:
 .PHONY: dotenv
 dotenv:
 ifeq ($(shell test -e .env.local && echo -n yes), yes)
-	$(call log_attention, "Skipping generation of .env.local for Shopware. File exists!")
-else
+	$(call log_attention, "Saving Shopware-generated .env.local as .env.local.bak!")
+	@cp .env.local .env.local.bak
+endif
 	$(call log_notice, "Generating .env for Shopware configuration from template")
 	@cp .env .env.local
 	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env.local
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env.local
-ifeq ($(CI), y)
-	$(call log_notice, "Updating .env for Shopware CI")
-	@sed -i -e "s/DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware/DATABASE_URL=mysql://shopware:shopware@loca:3306/shopware/g" .env.local
-	@sed -i -e "s/OPENSEARCH_URL=http://opensearch:9200/OPENSEARCH_URL=http://localhost:9200/g" .env.local
-	@sed -i -e "s/MAILER_DSN=smtp://shopware:shopware@mailpit:1025/MAILER_DSN=smtp://shopware:shopware@localhost:8025/g" .env.local
-endif
-endif
+	@sed -i -e "s/DATABASE_URL=mysql:\/\/shopware:shopware@127.0.0.1:3306\/shopware/DATABASE_URL=mysql:\/\/shopware:shopware@mysql:3306\/shopware/g" .env.local
+	@sed -i -e "s/APP_URL=http:\/\/localhost:8000/APP_URL=https:\/\/shopware.internal/g" .env.local
+	@sed -i -e "s/MAILER_DSN=smtp:\/\/shopware:shopware@127.0.0.1:1025/MAILER_DSN=smtp:\/\/shopware:shopware@mailpit:1025/g" .env.local
+	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:8000/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env.local
+	@sed -i -e "s/OPENSEARCH_URL=http:\/\/127.0.0.1:9200/OPENSEARCH_URL=http:\/\/opensearch:9200/g" .env.local
+	@sed -i -e "s/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127.0.0.1:4317/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/otel-collector:4317/g" .env.local
+
 
 # Generate the TLS CA certificate to create and sign server certificates for Traefik
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
@@ -383,6 +397,10 @@ endif
 .PHONY: secrets-dir
 secrets-dir:
 	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
+ifeq ($(shell test -e $(SECRETS_TLS_DIR)/backup.sql && echo -n yes ), yes)
+	$(call log_attention, "Found Shopware backup.sql in $(SECRETS_DIR)! Backing it up to /tmp/sw-backup.sql")
+	@cp $(SECRETS_DIR) /tmp/sw-backup.sql
+endif
 	@mkdir -p $(SECRETS_DIR)
 	@mkdir -p $(SECRETS_TLS_DIR)
 
@@ -411,10 +429,13 @@ prune-compose-network:
 	$(call log_attention, "Removing public Docker Compose network!")
 	@$(docker) network rm public --force
 
-.PHONY: prune-buildenv
-prune-buildenv:
-	$(call log_attention, "Removing Shopware build environment!")
-	@$(docker) compose -f docker/compose.yaml down -v
+#.PHONY: prune-buildenv
+#prune-buildenv:
+#	$(call log_attention, "Removing Shopware build environment!")
+#	@$(docker) compose -f docker/compose.yaml down -v
+
+.PHONY: prune-files
+prune-files: prune-secrets prune-output prune-deps prune-env prune-var prune-public prune-install prune-theme
 
 .PHONY: prune-secrets
 prune-secrets:
@@ -431,11 +452,18 @@ prune-deps:
 	$(call log_attention, "Removing Shopware dependencies in $(DEPENDENCY_DIR)!")
 	rm -rf $(DEPENDENCY_DIR)
 
+.PHONY: prune-env
+prune-env:
+	$(call log_attention, "Cleaning up Shopware var directory in $(VAR_DIR)!")
+	rm -rf $(ROOT_DIR)/.env.local*
+
 .PHONY: prune-var
 prune-var:
 	$(call log_attention, "Cleaning up Shopware var directory in $(VAR_DIR)!")
 	rm -rf $(VAR_DIR)/cache/*
 	rm -rf $(VAR_DIR)/log/*
+	rm -rf $(VAR_DIR)/*.json
+	rm -rf $(VAR_DIR)/*.scss
 
 .PHONY: prune-public
 prune-public:
@@ -450,6 +478,11 @@ prune-public:
 prune-install:
 	$(call log_attention, "Removing Shopware\'s install.lock!")
 	rm -rf $(ROOT_DIR)/install.lock
+
+.PHONY: prune-theme
+prune-theme:
+	$(call log_attention, "Removing Shopware theme configuration!")
+	rm -rf $(ROOT_DIR)/files/theme-config
 
 # ---------------------------
 # Checks

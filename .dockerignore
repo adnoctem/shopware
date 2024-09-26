@@ -13,9 +13,6 @@
 .shopware*.yml
 .env*
 .env.template
-/bin
-!/bin/console
-!/bin/ci
 Makefile
 Dockerfile
 docker/resources

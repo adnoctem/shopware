@@ -92,6 +92,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
+      - ../secrets/backup.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - internal
     labels:
@@ -179,6 +180,32 @@ services:
       - "traefik.http.routers.mailpit.rule=Host(`mailpit.shopware.internal`)"
       - "traefik.http.routers.mailpit.service=mailpit"
       - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+
+  # ref: https://hub.docker.com/_/phpmyadmin
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: phpmyadmin
+    ports:
+      - "8090"
+    environment:
+      PMA_HOST: mysql
+      PMA_ARBITRARY: 1
+      PMA_ABSOLUTE_URI: https://phpmyadmin.shopware.internal
+      MYSQL_ROOT_PASSWORD: shopware
+      APACHE_PORT: 8090
+    networks:
+      - public
+    labels:
+      - "application=phpmyadmin"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.phpmyadmin.entrypoints=https"
+      - "traefik.http.routers.phpmyadmin.tls=true"
+      - "traefik.http.routers.phpmyadmin.tls.domains[0].main=phpmyadmin.shopware.internal"
+      - "traefik.http.routers.phpmyadmin.tls.domains[0].sans=*.phpmyadmin.shopware.internal"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.shopware.internal`)"
+      - "traefik.http.routers.phpmyadmin.service=phpmyadmin"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=8090"
 
 configs:
   traefik.yml:
