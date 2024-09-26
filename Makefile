@@ -146,7 +146,7 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: dotenv buildenv deps secrets compose-network
+init: dotenv deps secrets compose-network
 endif
 
 define CI_INFO
@@ -284,14 +284,14 @@ buildenv:
 	$(call log_notice, "Starting Shopware build environment!")
 	@$(docker) compose -f docker/compose.yaml up -d
 
-.PHONY: symfony-start
-symfony-start: buildenv
+.PHONY: start
+start: buildenv
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
 	@symfony server:start -d --no-tls
 	@symfony server:log
 
-.PHONY: symfony-stop
-symfony-stop:
+.PHONY: stop
+stop:
 	$(call log_notice, "Stopping Shopware on local Symfony development server!")
 	@symfony server:stop
 	$(MAKE) prune-buildenv

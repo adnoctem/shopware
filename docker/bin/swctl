@@ -16,9 +16,9 @@ ctl_usage() {
 	echo
 	echo "Usage: $(basename "${0}") <COMMAND>"
 	echo
-	echo "init    - Initialize the Shopware 6 instance"
+	echo "init    - Initialize the Shopware instance"
 	echo "start   - Start the supervisord process"
-	echo "run     - Run Shopware 6 (init & start)"
+	echo "run     - Run Shopware (build, initialize & start)"
 	echo "help    - Print this usage information"
 	echo
 }
@@ -48,6 +48,14 @@ ctl_start() {
 	/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 }
 
+# ----------------------
+#   'build' function
+# ----------------------
+ctl_build() {
+  shopware_build_storefront
+  shopware_build_administration
+}
+
 # --------------------------------
 #   MAIN
 # --------------------------------
@@ -55,6 +63,10 @@ main() {
 	cmd=${1}
 
 	case "${cmd}" in
+	build)
+	  ctl_build
+	  return $?
+	  ;;
 	init)
 		ctl_init
 		return $?
@@ -64,6 +76,7 @@ main() {
 		return $?
 		;;
 	run)
+	  ctl_build
 		ctl_init
 		ctl_start
 		return $?

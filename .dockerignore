@@ -2,7 +2,6 @@
 .github
 .vscode
 .git
-.gitignore
 .*ignore
 .releaserc
 .*.{yaml,yml}
@@ -10,9 +9,13 @@
 .*.cache
 *.dist.php
 *.xml.dist
-.*config
+.pre-commit*.yaml
+.shopware*.yml
 .env*
 .env.template
+/bin
+!/bin/console
+!/bin/ci
 Makefile
 Dockerfile
 docker/resources
@@ -24,6 +27,5 @@ README.md
 LICENSE
 /secrets
 /docs
-/vendor
 /tests
 /scripts

@@ -117,7 +117,7 @@ COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
 
 # add container executables and library scripts
 COPY --chmod=755 docker/bin/swctl /usr/local/bin
-COPY --chmod=644 docker/lib/utils.sh /usr/local/lib
+COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
 
 # create and own directories required by services
 RUN <<EOF
@@ -175,23 +175,24 @@ HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
 FROM base as build
 
 # copy all sources
+COPY --link --chown=${USER}:${GROUP} . /var/www/html
 WORKDIR /var/www/html
-COPY --link --chown=${USER}:${GROUP} . ./
 
 # (re)-own files and directories
 #RUN find . -type f -not -path /var/www/html/bin -exec chmod 644 {} + && \
 #    find . -type d -exec chmod 755 {} + && \
 
-RUN chown -R ${USER}:${GROUP} .
-RUN rm -rf ./docker # remove non-ignorable docker dir
+# permissions
+RUN chown -R ${USER}:${GROUP} . && \
+    rm -rf ./docker # remove non-ignorable docker dir
 
 # build assets & install dependencies
 # ref: https://sw-cli.fos.gg/commands/project/#shopware-cli-project-ci
 USER ${USER}:${GROUP}
-RUN --mount=type=secret,id=composer_auth,dst=/home/${USER}/auth.json \
-    --mount=type=cache,target=/home/${USER}/.composer \
-    --mount=type=cache,target=/home/${USER}/.npm \
-    CI=1 bin/build-js.sh
+RUN --mount=type=secret,id=composer_auth,dst=./auth.json \
+    --mount=type=cache,target=/root/.composer \
+    --mount=type=cache,target=/root/.npm \
+    CI=1 swctl build
 
 FROM base as final
 

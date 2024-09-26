@@ -12,6 +12,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
+      - ./conf/mysql:/etc/mysql/conf.d
     labels:
       - "application=mysql"
     healthcheck:
