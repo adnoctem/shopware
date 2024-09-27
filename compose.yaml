@@ -35,13 +35,14 @@ services:
   shopware:
     image: fmjstudios/shopware:latest
     container_name: shopware
-    env_file: ../.env.local
+    env_file: .env.local
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     ports:
       - "9161"
     volumes:
-      # - .:/var/www/html:rw
-      # - ./custom/apps:/var/www/html/custom/apps:ro
       - sw-files:/var/www/html/files:rw
       - sw-theme:/var/www/html/public/theme:rw
       - sw-media:/var/www/html/public/media:rw
@@ -92,7 +93,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
-      - ../secrets/backup.sql:/docker-entrypoint-initdb.d/init.sql
+      # - secrets/backup.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - internal
     labels:
@@ -209,15 +210,15 @@ services:
 
 configs:
   traefik.yml:
-    file: resources/traefik.yml
+    file: docker/resources/traefik.yml
   traefik-dynamic.yml:
-    file: resources/traefik-dynamic.yml
+    file: docker/resources/traefik-dynamic.yml
 
 secrets:
   server.pem:
-    file: ../secrets/ssl/server.pem
+    file: secrets/ssl/server.pem
   server-key.pem:
-    file: ../secrets/ssl/server-key.pem
+    file: secrets/ssl/server-key.pem
 
 volumes:
   sw-files:

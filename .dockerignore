@@ -16,7 +16,7 @@
 Makefile
 Dockerfile
 docker/resources
-*compose.yaml
+compose.yaml
 *compose-override.yaml
 config/k8s
 config/ssl
