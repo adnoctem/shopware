@@ -31,6 +31,9 @@ ${CONFIG_START}
 127.0.0.1               traefik.shopware.internal                     # Traefik dashboard subdomain
 127.0.0.1               opensearch.shopware.internal                  # OpenSearch WebUI
 127.0.0.1               mailpit.shopware.internal                     # Mailpit WebUI
+127.0.0.1               phpmyadmin.shopware.internal                  # PHPMyAdmin
+127.0.0.1               grafana.shopware.internal                     # Grafana
+127.0.0.1               prometheus.shopware.internal                  # Prometheus
 
 ${CONFIG_END}
 EOF

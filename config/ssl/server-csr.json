@@ -5,7 +5,9 @@
     "traefik.shopware.internal",
     "opensearch.shopware.internal",
     "mailpit.shopware.internal",
-    "phpmyadmin.shopware.internal"
+    "phpmyadmin.shopware.internal",
+    "grafana.shopware.internal",
+    "prometheus.shopware.internal"
   ],
   "key": {
     "algo": "ecdsa",
