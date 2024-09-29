@@ -18,7 +18,6 @@
   [Docker Compose file][ci_compose]
 - [ ] Make Docker image rootless
 
-
 ## 💡 Ideas
 
 - Create the [Helm Chart](https://github.com/fmjstudios/helm) for this repository
@@ -26,11 +25,15 @@
   frontend
 - Write a plugin implementing autocomplete for the order process (internationally)
 - Write a plugin implementing the EU VIES API to enable net invoices for business customers
+- Use `MySQL Tuning Primer` to establish proven defaults to for our Shopware database configurations
+- Integrate `Shopware Deployment Helper` into `swctl` Docker container executable
 
 ## 🔗 Links
 
-- [GitHub - Awesome Shopware 6](https://github.com/elgentos/awesome-shopware6)
-- [Packagist - Shopware 6 Plugins](https://packagist.org/?query=shopware&type=shopware-platform-plugin)
+- [GitHub - Awesome Shopware 6](https://github.com/elgentos/awesome-shopware6 "GitHub Awesome Shopware 6")
+- [Packagist - Shopware 6 Plugins](https://packagist.org/?query=shopware&type=shopware-platform-plugin "Packagist Shopware Plugins")
+- [MySQL Tuning Primer](https://github.com/BMDan/tuning-primer.sh "MySQL Primer")
+- [Shopware Deployment Helper](https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/deployment-helper.html)
 
 <!-- INTERNAL REFERENCES -->
 
