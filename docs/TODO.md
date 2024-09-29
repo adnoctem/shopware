@@ -2,21 +2,17 @@
 
 ## ➕ Additions
 
-- [X] Add [DevTools plugin](https://github.com/shopware/dev-tools) as development dependency -> added contained
-  dependencies directly instead
 - [ ] Add [Shopware Analytics](https://store.shopware.com/en/swag541977532977f/shopware-analytics.html) (possibly via
   Composer) -> not possible in 'dev' mode (requires registered shop)
-- [X] Add [FroshTools](https://github.com/FriendsOfShopware/FroshTools)
-- [X] Add ~~[FroshAdminer](https://github.com/FriendsOfShopware/FroshPlatformAdminer)~~ -> decided against
-- [X] Add [Admin OAuth Plugin](https://github.com/HEPTACOM/HeptacomShopwarePlatformAdminOpenAuth) -> will create custom
-  implementation
-- [X] Add [HTML Minifier Plugin](https://github.com/FriendsOfShopware/FroshPlatformHtmlMinify)
 
 ## ✏️ Planned Changes
 
-- [ ] Use [GitHub's workflow service containers][github_service_containers] instead of a new
-  [Docker Compose file][ci_compose]
-- [ ] Make Docker image rootless
+- [X] ~~Use [GitHub's workflow service containers][github_service_containers] instead of a new
+  [Docker Compose file][ci_compose]~~ -> made obsolete by new discoveries/configurations
+- [X] Make Docker image rootless
+- [X] Integrate `Shopware Deployment Helper` into `swctl` Docker container executable -> completed before I even promote
+  it to a task
+- [ ] Write a `snippet-translator` Plugin
 
 ## 💡 Ideas
 
@@ -26,7 +22,6 @@
 - Write a plugin implementing autocomplete for the order process (internationally)
 - Write a plugin implementing the EU VIES API to enable net invoices for business customers
 - Use `MySQL Tuning Primer` to establish proven defaults to for our Shopware database configurations
-- Integrate `Shopware Deployment Helper` into `swctl` Docker container executable
 
 ## 🔗 Links
 
@@ -34,6 +29,7 @@
 - [Packagist - Shopware 6 Plugins](https://packagist.org/?query=shopware&type=shopware-platform-plugin "Packagist Shopware Plugins")
 - [MySQL Tuning Primer](https://github.com/BMDan/tuning-primer.sh "MySQL Primer")
 - [Shopware Deployment Helper](https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/deployment-helper.html)
+- [Admin OAuth Plugin](https://github.com/HEPTACOM/HeptacomShopwarePlatformAdminOpenAuth)
 
 <!-- INTERNAL REFERENCES -->
 
