@@ -1,51 +1,55 @@
 # custom editor configuration
-/.idea
+.idea
+
 # deps
-/vendor/
+vendor/
 *.txt
+
+# distribution
+dist
 
 # do not store Shopware plugins or apps in this repository, as they
 # should be managed through Comopser entirely. if a Composer installation
 # isn't offered for a required plugin, we use concoct
-/custom/apps/**
-!/custom/apps/.gitkeep
-/custom/plugins/**
-!/custom/plugins/.gitkeep
+custom/apps/**
+!custom/apps/.gitkeep
+custom/plugins/**
+!custom/plugins/.gitkeep
 
 ###> shopware/core ###
 # env config
-.env.*
 .*env
 .env*
-!.env
+!.env.template
 
 # ephemeral files
-/public/bundles/*
-/public/media/*
-/public/theme/*
-/public/thumbnail/*
-/public/sitemap/*
-/files/*
+public/bundles/*
+public/media/*
+public/theme/*
+public/thumbnail/*
+public/sitemap/*
+files/*
 !/files/.htaccess
-/var/*
+var/*
 !/var/.htaccess
-/secrets/
+secrets/
 
 # sensitive information
-/auth.json
-/install.lock
+auth.json
+install.lock
 public/asset-manifest.json
 ###< shopware/core ###
 
 ###> friendsofphp/php-cs-fixer ###
-/.php-cs-fixer.php
-/.php-cs-fixer.cache
+.php-cs-fixer.php
+.php-cs-fixer.cache
 ###< friendsofphp/php-cs-fixer ###
 ###> phpstan/phpstan ###
 phpstan.neon
 ###< phpstan/phpstan ###
 
 ###> phpunit/phpunit ###
-/phpunit.xml
+phpunit.xml
 .phpunit.result.cache
+.phpunit.cache
 ###< phpunit/phpunit ###

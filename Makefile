@@ -63,11 +63,11 @@ APPS_DIR := $(ROOT_DIR)/custom/apps
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
-DOCKERFILE := $(ROOT_DIR)/Dockerfile
+DOCKERFILE := $(DOCKER_DIR)/Dockerfile
+ENV_FILE := $(ROOT_DIR)/.env
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
-TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./scripts' --exclude='./.github'
-PHP_EXTENSIONS := +default +gd +intl +iconv +sodium +pdo +mysql
+TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./secrets' --exclude='./.github' --exclude='./dist' --exclude-from'=./.gitignore'
 PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
 APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 
@@ -155,6 +155,8 @@ init:
 ifeq ($(CI), y)
 	$(call log_notice, "Installing Composer dependencies")
 	@$(MAKE) deps
+	$(call log_notice, "Generating new custom .env.local file from .env")
+	@$(MAKE) dotenv ENV=test
 else
 	$(call log_notice, "Installing Composer dependencies")
 	@$(MAKE) deps
@@ -170,10 +172,9 @@ endif
 endif
 
 define ENV_INFO
-# Manage the development environment for Shopware 6. This creates a local Docker Compose
-# project using Traefik, which provides HTTPS access to all (public) services within the
-# project. Finally the target will follow the Docker logs for the "shopware" container.
-# If the "DESTROY" variable is set it will remove the environment.
+# Manage the execution environment for Shopware 6. This creates a local Docker Compose
+# project which bootstraps a local MySQL 8 database and ElasticSearch 2 Node, which
+# Shopware requires for Docker image builds, etc.
 #
 # See the target's prerequisites for information about the commands executed.
 #
@@ -185,33 +186,58 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: compose
+env:
+	@$(MAKE) compose CI=y
 endif
 
-define ENV_CLEANUP_INFO
+define DEV_INFO
+# Manage the development environment for Shopware 6. This creates a local Docker Compose
+# project using Traefik, which provides HTTPS access to all (public) services within the
+# project. Finally the target will follow the Docker logs for the "shopware" container.
+# If the "DESTROY" variable is set it will remove the environment.
+#
+# See the target's prerequisites for information about the commands executed.
+#
+# Arguments:
+#   PRINT_HELP: 'y' or 'n'
+endef
+.PHONY: dev
+ifeq ($(PRINT_HELP), y)
+dev:
+	echo "$$DEV_INFO"
+else
+dev:
+	@$(MAKE) compose
+endif
+
+define DEV_CLEANUP_INFO
 # Clean up the development environment for Shopware 6.
 #
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
 endef
-.PHONY: env-cleanup
+.PHONY: clean
 ifeq ($(PRINT_HELP), y)
-env-cleanup:
-	echo "$$ENV_CLEANUP_INFO"
+clean:
+	echo "$$DEV_CLEANUP_INFO"
 else
-env-cleanup: prune-compose
+clean:
+	@$(MAKE) prune-compose CI=$(CI)
 endif
 
 define TESTS_INFO
-# Run each plugin or app's custom test suite via sub-makes.
+# Run tests for Shopware using PHPUnit. This does basic validation that the application
+# still boots and runs with our current configuration.
 endef
-#.PHONY: tests
-#ifeq ($(PRINT_HELP), y)
-#tests:
-#	echo "$$TESTS_INFO"
-#else
-#tests:
-#endif
+.PHONY: tests
+ifeq ($(PRINT_HELP), y)
+tests:
+	echo "$$TESTS_INFO"
+else
+tests:
+	@$(MAKE) dotenv ENV=test
+	@composer run tests
+endif
 
 define PRUNE_INFO
 # Remove the local configuration
@@ -225,7 +251,12 @@ ifeq ($(PRINT_HELP), y)
 prune:
 	echo "$$PRUNE_INFO"
 else
-prune: prune-bootstrap prune-compose prune-compose-network prune-files
+prune:
+	@$(MAKE) prune-bootstrap
+	@$(MAKE) prune-compose
+	@$(MAKE) prune-compose CI=y
+	@$(MAKE) prune-compose-network
+	@$(MAKE) prune-files
 endif
 
 # ---------------------------
@@ -240,9 +271,7 @@ ifeq ($(PRINT_HELP), y)
 image:
 	echo "$$IMAGE_INFO"
 else
-image:
-	$(call log_notice, "Setting up local infrastructure...")
-	$(MAKE) compose CI=y
+image: env
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
 	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest \
  		--target $(ENV) \
@@ -259,10 +288,10 @@ ifeq ($(PRINT_HELP), y)
 bundle:
 	echo "$$BUNDLE_INFO"
 else
-bundle: output-dir
+bundle: prune-output output-dir
 	$(call log_notice, "Building a Tarball bundle of $(APP)!")
-	@tar -cvzf $(TAR_EXCLUDE_FLAGS) $(OUTPUT_DIR)/$(NAME)_$(VERSION).tar.gz .
-	@cd $(OUTPUT_DIR) && sha256sum >> CHECKSUMS_SHA256.txt
+	@tar $(TAR_EXCLUDE_FLAGS) -cvzf $(OUTPUT_DIR)/bundle.tar.gz .
+	@cd $(OUTPUT_DIR) && sha256sum bundle.tar.gz >> CHECKSUMS_SHA256.txt
 endif
 
 # ---------------------------
@@ -307,7 +336,7 @@ dumps:
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
 	@$(docker) compose -f docker/compose.yaml up -d
-	@symfony server:start -d --no-tls
+	@symfony server:start -d --no-tls --port=$(PORT)
 	@symfony server:log
 
 .PHONY: stop
@@ -317,13 +346,14 @@ stop:
 	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
 	@$(docker) compose -f docker/compose.yaml down -v
 
+.ONESHELL:
 .PHONY: compose
-compose:
+compose: dotenv
 	$(call log_notice, "Starting Docker Compose project")
 ifeq ($(CI), y)
-	@$(docker) compose -f docker/compose-ci.yaml up -d
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose-ci.yaml up -d
 else
-	@$(docker) compose -f compose.yaml up -d --build
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose.yaml up -d --build
 	@sleep 5
 	@$(MAKE) logs APP=shopware
 endif
@@ -359,20 +389,33 @@ logs:
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv
 dotenv:
-ifeq ($(shell test -e .env.local && echo -n yes), yes)
+ifeq ($(ENV), test)
+ifeq ($(shell test -e .env.test && echo -n yes), yes)
+	$(call log_attention, "Skipping generation of .env.test: file exists!")
+else
+	$(call log_notice, "Generating .env.test for Shopware testing from template")
+	@cp .env.template .env.test
+endif
+else
+ifeq ($(shell test -e .env && echo -n yes), yes)
 	$(call log_attention, "Skipping generation of .env.local: file exists!")
 else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
-	@cp .env .env.local
-	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env.local
-	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env.local
-	@sed -i -e "s/DATABASE_URL=mysql:\/\/shopware:shopware@127.0.0.1:3306\/shopware/DATABASE_URL=mysql:\/\/shopware:shopware@mysql:3306\/shopware/g" .env.local
-	@sed -i -e "s/APP_URL=http:\/\/localhost:8000/APP_URL=https:\/\/shopware.internal/g" .env.local
-	@sed -i -e "s/MAILER_DSN=smtp:\/\/shopware:shopware@127.0.0.1:1025/MAILER_DSN=smtp:\/\/shopware:shopware@mailpit:1025/g" .env.local
-	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:8000/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env.local
-	@sed -i -e "s/OPENSEARCH_URL=http:\/\/127.0.0.1:9200/OPENSEARCH_URL=http:\/\/opensearch:9200/g" .env.local
-	@sed -i -e "s/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127.0.0.1:4317/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/otel-collector:4317/g" .env.local
+	@cp .env.template .env
+	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env
+	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+	@sed -i -e "s/DATABASE_URL=mysql:\/\/shopware:shopware@127.0.0.1:3306\/shopware/DATABASE_URL=mysql:\/\/shopware:shopware@mysql:3306\/shopware/g" .env
+	@sed -i -e "s/APP_URL=http:\/\/localhost:9161/APP_URL=https:\/\/shopware.internal/g" .env
+	@sed -i -e "s/MAILER_DSN=smtp:\/\/shopware:shopware@127.0.0.1:1025/MAILER_DSN=smtp:\/\/shopware:shopware@mailpit:1025/g" .env
+	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:9161/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env
+	@sed -i -e "s/OPENSEARCH_URL=http:\/\/127.0.0.1:9200/OPENSEARCH_URL=http:\/\/opensearch:9200/g" .env
+	@sed -i -e "s/OTEL_PHP_AUTOLOAD_ENABLED=false/OTEL_PHP_AUTOLOAD_ENABLED=true/g" .env
+	@sed -i -e "s/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127.0.0.1:4317/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/otel-collector:4317/g" .env
+	@sed -i -e "s/S3_ACCESS_KEY=CHANGEME/S3_ACCESS_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+	@sed -i -e "s/S3_SECRET_KEY=CHANGEME/S3_SECRET_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 64)/g" .env
 endif
+endif
+
 
 # Generate the TLS CA certificate to create and sign server certificates for Traefik
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
@@ -434,9 +477,9 @@ prune-bootstrap:
 prune-compose:
 	$(call log_attention, "Stopping Docker Compose project!")
 ifeq ($(CI), y)
-	@$(docker) compose -f docker/compose-ci.yaml down -v
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose-ci.yaml down -v
 else
-	@$(docker) compose -f compose.yaml down -v
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose.yaml down -v
 endif
 
 .PHONY: prune-compose-network
