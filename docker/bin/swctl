@@ -31,13 +31,7 @@ ctl_usage() {
 # Set up Shopware 6 if an installation is found, otherwise install the application
 ctl_init() {
 	database_connection_check
-	if pc system:is-installed; then
-		shopware_setup
-	else
-		shopware_install
-	fi
-	shopware_install_extensions
-	shopware_clear_cache
+	deployment_helper
 }
 
 # ----------------------

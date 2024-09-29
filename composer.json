@@ -11,6 +11,7 @@
     "open-telemetry/transport-grpc": "^1.0",
     "shopware/administration": "^6.6",
     "shopware/core": "^6.6",
+    "shopware/deployment-helper": "^0.0.6",
     "shopware/elasticsearch": "^6.6",
     "shopware/opentelemetry": "^0.1.5",
     "shopware/storefront": "^6.6",
@@ -57,6 +58,9 @@
     "dev": [
       "@symfony server:start -d --no-tls",
       "@symfony server:log"
+    ],
+    "tests": [
+      "phpunit"
     ],
     "auto-scripts": {
       "assets:install": "symfony-cmd"

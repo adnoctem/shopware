@@ -1,8 +1,8 @@
 # FMJ Studios Shopware
-# .shopware-project.yml configures the Shopware-CLI
+# .shopware-project.yml (mostly) configures the Shopware-CLI
 # ref: https://sw-cli.fos.gg/shopware-project-yml-schema/
 
-url: "http://localhost"
+url: "https://shopware.internal"
 #admin_api:
 #  # force use of an integration in production - source values from environment
 #  client_id: ${SHOPWARE_CLIENT_ID}
@@ -21,3 +21,35 @@ build:
 #  config:
 #    - settings:
 #        SwagPayPal.settings.sandbox: true
+
+# Configure the Shopware Deployment-Helper
+# see: https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/deployment-helper.html
+deployment:
+  hooks:
+    pre: |
+      echo "Starting Shopware deployment..."
+    post: |
+      echo "Finishing up Shopware deployment!"
+    pre-install: |
+      echo "Installing Shopware System..."
+    post-install: |
+      echo "Installed Shopware System!"
+    pre-update: |
+      echo "Updating Shopware System..."
+    post-update: |
+      echo "Updated Shopware System"
+
+  # Automatically installs and updates all extensions included in custom/plugins and custom/apps and composer
+  extension-management:
+    enabled: true
+    # These extensions are not managed, you should use one-time-tasks to manage them
+    # exclude:
+
+  # runs one time in deployment, then never again
+  one-time-tasks:
+    - id: elasticsearch
+      script: |
+        ./bin/console es:index -n
+    - id: cache
+      script: |
+        ./bin/console cache:clear -n

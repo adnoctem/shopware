@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cbeddb4f17329a3cc914408ee0839e48",
+    "content-hash": "ce5f9c9bc72efd36d7d8c57d988912f2",
     "packages": [
         {
             "name": "brick/math",
@@ -844,6 +844,51 @@
                 "source": "https://github.com/defuse/php-encryption/tree/v2.4.0"
             },
             "time": "2023-06-19T06:10:36+00:00"
+        },
+        {
+            "name": "digilist/dependency-graph",
+            "version": "v0.4.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/digilist/dependency-graph.git",
+                "reference": "a67407e774d41cfd81a058ee074dd149951ff19c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/digilist/dependency-graph/zipball/a67407e774d41cfd81a058ee074dd149951ff19c",
+                "reference": "a67407e774d41cfd81a058ee074dd149951ff19c",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.0",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^10 || ^11"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Digilist\\DependencyGraph\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Markus Fasselt",
+                    "email": "markus.fasselt@gmail.com"
+                }
+            ],
+            "description": "Dependency Graph Resolver in PHP",
+            "support": {
+                "issues": "https://github.com/digilist/dependency-graph/issues",
+                "source": "https://github.com/digilist/dependency-graph/tree/v0.4.2"
+            },
+            "time": "2024-08-07T07:07:37+00:00"
         },
         {
             "name": "doctrine/cache",
@@ -5604,6 +5649,71 @@
                 "wiki": "https://developer.shopware.com"
             },
             "time": "2024-09-17T14:27:18+00:00"
+        },
+        {
+            "name": "shopware/deployment-helper",
+            "version": "0.0.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/shopware/deployment-helper.git",
+                "reference": "caa6036cadb52735956c65517f0ddc882b333283"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/shopware/deployment-helper/zipball/caa6036cadb52735956c65517f0ddc882b333283",
+                "reference": "caa6036cadb52735956c65517f0ddc882b333283",
+                "shasum": ""
+            },
+            "require": {
+                "digilist/dependency-graph": ">=0.4.1",
+                "doctrine/dbal": "^3.0 || ^4.0",
+                "ext-dom": "*",
+                "ext-pdo": "*",
+                "php": ">=8.2",
+                "symfony/config": "^7.0 || ^6.0",
+                "symfony/console": "^7.0 || ^6.0",
+                "symfony/dependency-injection": "^7.0 || ^6.0",
+                "symfony/dotenv": "^7.0 || ^6.0",
+                "symfony/event-dispatcher": "^7.0 || ^6.0",
+                "symfony/filesystem": "^7.0 || ^6.0",
+                "symfony/finder": "^7.0 || ^6.0",
+                "symfony/process": "^7.0 || ^6.0",
+                "symfony/yaml": "^7.0 || ^6.0"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "v3.63.2",
+                "phpstan/extension-installer": "1.4.2",
+                "phpstan/phpstan": "1.12.0",
+                "phpstan/phpstan-deprecation-rules": "1.2.0",
+                "phpstan/phpstan-phpunit": "1.4.0",
+                "phpstan/phpstan-strict-rules": "1.6.0",
+                "phpstan/phpstan-symfony": "1.4.8",
+                "phpunit/phpunit": "11.3.1",
+                "symfony/var-dumper": "^7.0 || ^6.0"
+            },
+            "bin": [
+                "bin/shopware-deployment-helper"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Shopware\\Deployment\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Shopware deployment tools",
+            "keywords": [
+                "deployment",
+                "shopware"
+            ],
+            "support": {
+                "issues": "https://github.com/shopware/deployment-helper/issues",
+                "source": "https://github.com/shopware/deployment-helper/tree/0.0.6"
+            },
+            "time": "2024-08-30T07:09:43+00:00"
         },
         {
             "name": "shopware/elasticsearch",

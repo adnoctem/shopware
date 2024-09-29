@@ -16,6 +16,14 @@ ROOT="${CWD}"
 SW_TOOL="${ROOT}/bin/console" # use console by default
 ENV_FILE="${ROOT}/.env"
 
+
+# deployment-helper - lock in our defaults
+export INSTALL_LOCALE="${INSTALL_LOCALE:-"en-GB"}"
+export INSTALL_CURRENCY="${INSTALL_CURRENCY:-"EUR"}"
+export INSTALL_ADMIN_USERNAME="${INSTALL_ADMIN_USERNAME:-"admin"}"
+export INSTALL_ADMIN_PASSWORD="${INSTALL_ADMIN_PASSWORD:-"shopware"}"
+export SALES_CHANNEL_URL="${APP_URL:-"http://localhost:${PORT:-"9161"}"}"
+
 #######################################
 # Log a line with the date and file.
 # Globals:
@@ -41,6 +49,8 @@ log() {
 #   The console the outputs.
 #######################################
 pc() {
+  ensure_project_root
+
 	# ensure is executable
 	if [ ! -x "${SW_TOOL}" ]; then
 		chmod +x "${SW_TOOL}"
@@ -74,6 +84,66 @@ ensure_project_root() {
 }
 
 #######################################
+# Check that the database connection available
+# Globals:
+#   DATABASE_URL
+#   DATABASE_HOST
+#   DATABASE_TIMEOUT
+# Arguments:
+#   None
+# Outputs:
+#   Logs remaining seconds on each iteration.
+#######################################
+database_connection_check() {
+	echo "|--------------------------------------------------------------|"
+	echo "|       Checking for an active MySQL/MariaDB connection        |"
+	echo "|--------------------------------------------------------------|"
+
+	# shellcheck disable=SC2086
+	database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
+	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
+	tries=0
+
+	until nc -z -w$((DATABASE_TIMEOUT + 20)) -v "$database_host" "${database_port:-3306}"; do
+		log "Waiting $((DATABASE_TIMEOUT - tries)) more seconds for database connection to become available"
+		sleep 1
+		tries=$((tries + 1))
+
+		if [ "$tries" -eq "${DATABASE_TIMEOUT}" ]; then
+			log "FATAL: Could not connect to database within timeout of ${tries} seconds. Exiting."
+			exit 1
+		fi
+	done
+}
+
+#######################################
+# Check that the database connection available
+# Globals:
+#   INSTALL_LOCALE
+#   INSTALL_CURRENCY
+#   INSTALL_ADMIN_USERNAME
+#   INSTALL_ADMIN_PASSWORD
+#   SALES_CHANNEL_URL
+# Arguments:
+#   None
+# Outputs:
+#   Logs remaining seconds on each iteration.
+#######################################
+deployment_helper() {
+	echo "|--------------------------------------------------------------|"
+	echo "|             Running Shopware Deployment Helper               |"
+	echo "|--------------------------------------------------------------|"
+
+	ensure_project_root
+	if ! vendor/bin/shopware-deployment-helper run; then
+	  log "ERROR: Could not run Shopware Deployment-Helper! Exited with status $?"
+	else
+	  log "Shopware Deployment-Helper executed successfully!"
+	fi
+}
+
+#######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Load a .env file.
 # Globals:
 #   LOAD_DOTENV
@@ -83,6 +153,8 @@ ensure_project_root() {
 #   None.
 #######################################
 load_dotenv() {
+  log "DEPRECATED: using deprecated Bash utility function 'load_dotenv' - Shopware's Deployment Helper supports .env files!"
+
 	LOAD_DOTENV=${LOAD_DOTENV:-"1"}
 
 	if [ "$LOAD_DOTENV" = "0" ]; then
@@ -121,39 +193,7 @@ load_dotenv() {
 }
 
 #######################################
-# Check that the database connection available
-# Globals:
-#   DATABASE_URL
-#   DATABASE_HOST
-#   DATABASE_TIMEOUT
-# Arguments:
-#   None
-# Outputs:
-#   Logs remaining seconds on each iteration.
-#######################################
-database_connection_check() {
-	echo "|--------------------------------------------------------------|"
-	echo "|       Checking for an active MySQL/MariaDB connection        |"
-	echo "|--------------------------------------------------------------|"
-
-	# shellcheck disable=SC2086
-	database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
-	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
-	tries=0
-
-	until nc -z -w$((DATABASE_TIMEOUT + 20)) -v "$database_host" "${database_port:-3306}"; do
-		log "Waiting $((DATABASE_TIMEOUT - tries)) more seconds for database connection to become available"
-		sleep 1
-		tries=$((tries + 1))
-
-		if [ "$tries" -eq "${DATABASE_TIMEOUT}" ]; then
-			log "FATAL: Could not connect to database within timeout of ${tries} seconds. Exiting."
-			exit 1
-		fi
-	done
-}
-
-#######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Clear the Shopware Cache for APP_ENV.
 # Globals:
 #   APP_ENV
@@ -163,11 +203,14 @@ database_connection_check() {
 #   Shopware CLI outputs.
 #######################################
 shopware_clear_cache() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_clear_cache' please use 'deployment_helper' to run such tasks!"
+
 	log "INFO: Clearing Shopware HTTP cache for environment \"$APP_ENV\""
 	pc cache:clear --env="${APP_ENV}" -n
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Install all Shopware extensions
 # Globals:
 #   None
@@ -177,6 +220,8 @@ shopware_clear_cache() {
 #   Shopware CLI outputs.
 #######################################
 shopware_install_extensions() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_install_extensions' please use 'deployment_helper' to install Shopware extensions!"
+
 	list_with_updates=$(php bin/console plugin:list --json | jq 'map(select(.installedAt == null)) | .[].name' -r)
 
 	for plugin in $list_with_updates; do
@@ -186,6 +231,7 @@ shopware_install_extensions() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Update all Shopware extensions
 # Globals:
 #   None
@@ -195,6 +241,8 @@ shopware_install_extensions() {
 #   Shopware CLI outputs.
 #######################################
 shopware_update_extensions() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_update_extensions' please use 'deployment_helper' to update Shopware extensions!"
+
 	list_with_updates=$(php bin/console plugin:list --json | jq 'map(select(.upgradeVersion != null)) | .[].name' -r)
 
 	for plugin in $list_with_updates; do
@@ -204,6 +252,7 @@ shopware_update_extensions() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Set up a new Shopware installation.
 # Globals:
 #   INSTALL_LOCALE
@@ -216,6 +265,8 @@ shopware_update_extensions() {
 #   Shopware CLI outputs.
 #######################################
 shopware_install() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_install' please use 'deployment_helper' to install Shopware!"
+
 	completed_at=$(date '+%Y-%m-%dT%H:%M:%S+00:00')
 	storefront_name=Storefront
 
@@ -229,6 +280,7 @@ shopware_install() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'deployment_helper'
 # Set up an existing Shopware installation.
 # Globals:
 #   SHOPWARE_SKIP_ASSET_COPY
@@ -238,6 +290,8 @@ shopware_install() {
 #   Shopware CLI outputs.
 #######################################
 shopware_setup() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_setup' please use 'deployment_helper' to setup Shopware!"
+
 	log "INFO: Setting up Shopware 6 shop..."
 
 	if [ -z "${SHOPWARE_SKIP_ASSET_COPY:-""}" ]; then pc plugin:update:all; else pc plugin:update:all --skip-asset-build; fi
@@ -248,6 +302,7 @@ shopware_setup() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'shopware-cli project ci'
 # Install Shopware Composer dependencies.
 # Globals:
 #   SW_TOOL
@@ -262,6 +317,8 @@ shopware_setup() {
 #   Shopware build logs.
 #######################################
 shopware_install_dependencies() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to install Shopware dependencies!"
+
 	ensure_project_root
 
   args="--prefer-dist --no-interaction"
@@ -284,6 +341,7 @@ shopware_install_dependencies() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'shopware-cli project ci'
 # Build the Shopware storefront.
 # Adapted from bin/build-storefront.sh.
 # Globals:
@@ -299,6 +357,8 @@ shopware_install_dependencies() {
 #   Shopware build logs.
 #######################################
 shopware_build_storefront() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to build Shopware!"
+
 	ensure_project_root
 	# old PWD
 	OLD_WD=$(pwd)
@@ -354,6 +414,7 @@ shopware_build_storefront() {
 }
 
 #######################################
+# NOTE: DEPRECATED - USE 'shopware-cli project ci'
 # Build the Shopware administration.
 # Adapted from bin/build-administration.sh.
 # Globals:
@@ -367,6 +428,8 @@ shopware_build_storefront() {
 #######################################
 
 shopware_build_administration() {
+  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_administration' please use 'shopware-cli project ci' to build Shopware!"
+
 	ensure_project_root
 	# old PWD
 	OLD_WD=$(pwd)

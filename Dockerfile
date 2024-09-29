@@ -171,7 +171,11 @@ RUN rm -rf ./docker # remove non-ignorable docker dir
 
 # provide your own envs - we only set what's required
 ENV APP_ENV=dev \
-    LOCK_DSN=flock
+    LOCK_DSN=flock \
+    INSTALL_LOCALE=en-GB \
+    INSTALL_CURRENCY=EUR \
+    INSTALL_ADMIN_USERNAME=admin \
+    INSTALL_ADMIN_PASSWORD=shopware
 
 RUN --mount=type=secret,id=composer_auth,dst=./auth.json \
     --mount=type=cache,target=/root/.composer \
@@ -236,7 +240,7 @@ ENV APP_ENV=prod \
     OTEL_METRICS_EXPORTER=otlp \
     OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
     OTEL_EXPORTER_OTLP_ENDPOINT=https://opentelemetry-exporter:4317 \
-    INSTALL_LOCALE="en-GB" \
+    INSTALL_LOCALE=en-GB \
     INSTALL_CURRENCY=EUR \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
