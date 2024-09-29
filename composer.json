@@ -7,6 +7,8 @@
     "ext-opentelemetry": "*",
     "composer-runtime-api": "^2.0",
     "frosh/tools": "^2.3",
+    "open-telemetry/exporter-otlp": "^1.0",
+    "open-telemetry/transport-grpc": "^1.0",
     "shopware/administration": "^6.6",
     "shopware/core": "^6.6",
     "shopware/elasticsearch": "^6.6",
@@ -42,7 +44,8 @@
   "config": {
     "allow-plugins": {
       "symfony/flex": true,
-      "symfony/runtime": true
+      "symfony/runtime": true,
+      "php-http/discovery": true
     },
     "optimize-autoloader": true,
     "sort-packages": true
