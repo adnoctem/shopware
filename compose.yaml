@@ -94,8 +94,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
-      # - ./docker/conf/mysql:/etc/mysql/conf.d
-      # - secrets/backup.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./docker/conf/mysql/my.cnf:/etc/mysql/my.cnf
     networks:
       - internal
     labels:
