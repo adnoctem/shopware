@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # shellcheck shell=sh
 
 # Environment variables
@@ -264,13 +264,13 @@ shopware_setup() {
 shopware_install_dependencies() {
 	ensure_project_root
 
-  def_args="--prefer-dist --no-interaction"
-  if [ "${APP_ENV:-"dev"}" = "prod" ]; then def_args="${def_args} --no-dev"; fi
-  raw_args=$(echo "$def_args" | tr ' ' ' ' 2>/dev/null | while read -r item; do echo "$item "; done)
-  args=$(echo "$raw_args" | awk '{$1=$1};1') # trim leading/trailing spaces
+  args="--prefer-dist --no-interaction"
+  if [ "${APP_ENV:-"dev"}" = "prod" ]; then args="${args} --no-dev"; fi
 
 	if [ "$(command -v composer)" ]; then
-    if ! composer install "${args}";
+    # shellcheck disable=SC2086
+    # required here since composer will not accept multiple options quoted
+    if ! composer install ${args};
     then
       log "ERROR: Could not install Shopware dependencies!"
       return 1
@@ -302,7 +302,7 @@ shopware_build_storefront() {
 	ensure_project_root
 	# old PWD
 	OLD_WD=$(pwd)
-	if [ -e "${CWD}/vendor/shopware/platform" ]; then
+	if [[ -e "${CWD}/vendor/shopware/platform" ]]; then
 		STOREFRONT_ROOT="${STOREFRONT_ROOT:-"${CWD}/vendor/shopware/platform/src/Storefront"}"
 	else
 		STOREFRONT_ROOT="${STOREFRONT_ROOT:-"${CWD}/vendor/shopware/storefront"}"
@@ -310,11 +310,11 @@ shopware_build_storefront() {
 
 	# build the storefront
 	# shellcheck disable=SC2086
-	[ ${SHOPWARE_SKIP_BUNDLE_DUMP:-""} ] || pc bundle:dump
-	[ "${SHOPWARE_SKIP_FEATURE_DUMP:-""}" ] || pc feature:dump
+	[[ ${SHOPWARE_SKIP_BUNDLE_DUMP:-""} ]] || pc bundle:dump
+	[[ "${SHOPWARE_SKIP_FEATURE_DUMP:-""}" ]] || pc feature:dump
 
 	# parse var/plugins.json
-	if [ "$(command -v jq)" ]; then
+	if [[ "$(command -v jq)" ]]; then
 		jq -c '.[]' "var/plugins.json" | while read -r config; do
 			path=$(echo "$config" | jq -r '(.basePath + .storefront.path)')
 
@@ -323,12 +323,12 @@ shopware_build_storefront() {
 			name=$(echo "$config" | jq -r '.technicalName')
 
 			# skip if required
-			skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
-			if [ "$(eval "echo \"\$$skippingEnvVarName\"")" ]; then
-				continue
-			fi
+      skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
+      if [[ ${!skippingEnvVarName:-""} ]]; then
+          continue
+      fi
 
-			if [ -f "$parent_path/package.json" ] && [ ! -d "$parent_path/node_modules" ] &&  [ "$name" != "storefront" ]; then
+			if [[ -f "$parent_path/package.json"  &&   ! -d "$parent_path/node_modules"  && "$name" != "storefront" ]]; then
 				log "-> Installing npm dependencies for ${name}"
 				npm i --prefix "${parent_path}" --prefer-offline
 			fi
@@ -346,11 +346,11 @@ shopware_build_storefront() {
 	npm --prefix "${STOREFRONT_ROOT}/Resources/app/storefront run production"
 
 	# copy assets
-	[ "${SHOPWARE_SKIP_ASSET_COPY:-""}" ] || pc assets:install
-	[ "${SHOPWARE_SKIP_THEME_COMPILE:-""}" ] || pc theme:compile --active-only
+	[[ "${SHOPWARE_SKIP_ASSET_COPY:-""}" ]] || pc assets:install
+	[[ "${SHOPWARE_SKIP_THEME_COMPILE:-""}" ]] || pc theme:compile --active-only
 
 	# clear cache
-	[ "${SHOPWARE_SKIP_CLEAR_CACHE:-""}" ] || pc cache:clear
+	[[ "${SHOPWARE_SKIP_CLEAR_CACHE:-""}" ]] || pc cache:clear
 }
 
 #######################################
@@ -370,8 +370,7 @@ shopware_build_administration() {
 	ensure_project_root
 	# old PWD
 	OLD_WD=$(pwd)
-  env=$(printenv)
-	curenv=$(echo "$env" | sed -e 's/^/export /')
+	curenv=$(declare -p -x)
 	load_dotenv "${ENV_FILE}"
 
 	# Restore environment variables
@@ -379,7 +378,7 @@ shopware_build_administration() {
 	eval "${curenv}"
 	set +o allexport
 
-	if [ -e "${CWD}/vendor/shopware/platform" ]; then
+	if [[ -e "${CWD}/vendor/shopware/platform" ]]; then
 		ADMIN_ROOT="${ADMIN_ROOT:-"${CWD}/vendor/shopware/platform/src/Administration"}"
 	else
 		ADMIN_ROOT="${ADMIN_ROOT:-"${CWD}/vendor/shopware/administration"}"
@@ -387,10 +386,10 @@ shopware_build_administration() {
 
 	# build the storefront
 	pc feature:dump # is required, cannot be overwritten for admin
-	[ "${SHOPWARE_SKIP_BUNDLE_DUMP:-""}" ] || pc bundle:dump
+	[[ "${SHOPWARE_SKIP_BUNDLE_DUMP:-""}" ]] || pc bundle:dump
 
 	# parse var/plugins.json
-	if [ "$(command -v jq)" ]; then
+	if [[ "$(command -v jq)" ]]; then
 		jq -c '.[]' "var/plugins.json" | while read -r config; do
 			path=$(echo "$config" | jq -r '(.basePath + .administration.path)')
 
@@ -398,13 +397,13 @@ shopware_build_administration() {
 			parent_path=$(dirname "$path")
 			name=$(echo "$config" | jq -r '.technicalName')
 
-			# skip if required
-			skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
-			if [ "$(eval "echo \"\$$skippingEnvVarName\"")" ]; then
-				continue
-			fi
+			# skip if env indicates to do so
+      skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
+      if [[ ${!skippingEnvVarName:-""} ]]; then
+          continue
+      fi
 
-			if [ -f "$parent_path/package.json" ] &&  [ ! -d "$parent_path/node_modules" ] && [ "$name" != "administration" ]; then
+			if [[ -f "$parent_path/package.json"  &&   ! -d "$parent_path/node_modules"  && "$name" != "administration" ]]; then
 				log "-> Installing npm dependencies for ${name}"
 				npm i --prefix "${parent_path}" --prefer-offline
 			fi
@@ -416,7 +415,7 @@ shopware_build_administration() {
 		exit 1
 	fi
 
-	(cd "${ADMIN_ROOT}" && npm install --prefer-offline --production)
+	(cd "${ADMIN_ROOT}" && npm install --prefer-offline --omit=dev)
 
 	# dump PHP entity schema
 	if [ -z "${SHOPWARE_SKIP_ENTITY_SCHEMA_DUMP:-""}" ] && [ -f "${ADMIN_ROOT}/Resources/app/administration/scripts/entitySchemaConverter/entity-schema-converter.ts" ]; then
