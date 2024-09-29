@@ -10,11 +10,11 @@
 *.dist.php
 *.xml.dist
 .pre-commit*.yaml
-.shopware*.yml
 .env*
 .env.template
 Makefile
 Dockerfile
+/bin/*.sh
 docker/resources
 compose.yaml
 *compose-override.yaml
@@ -26,3 +26,4 @@ LICENSE
 /docs
 /tests
 /scripts
+/vendor
