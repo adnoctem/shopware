@@ -4,6 +4,7 @@
 ARG VERSION=0.1.0
 ARG PHP_VERSION=8.2
 
+# pin versions
 FROM php:$PHP_VERSION-fpm-alpine as base
 
 # OpenContainers Annotations
@@ -34,7 +35,36 @@ RUN curl -sSLf \
         -o /usr/local/bin/install-php-extensions \
         https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions && \
     chmod +x /usr/local/bin/install-php-extensions && \
-    install-php-extensions @composer gd intl mysqli pdo_mysql zip redis opcache apcu sodium opentelemetry grpc
+    install-php-extensions \
+        @composer \
+        bcmath \
+        gd \
+        intl \
+        mysqli \
+        pdo_mysql \
+        pcntl \
+        sockets \
+        bz2 \
+        gmp \
+        soap \
+        zip \
+        ffi \
+        redis \
+        opcache \
+        apcu \
+        amqp \
+        sodium \
+        opentelemetry \
+        grpc
+
+# install OS dependencies
+RUN apk add --no-cache \
+    bash=~5.2 \
+    nginx=~1.26 \
+    supervisor=~4.2 \
+    jq=~1.7 \
+    trurl \
+    envsubst
 
 # define core environment variables (php-cli, php-fpm, utils.sh)
 ENV PUID=${PUID} \
@@ -45,7 +75,7 @@ ENV PUID=${PUID} \
     PHP_DISPLAY_ERRORS=Off \
     PHP_MAX_UPLOAD_SIZE=32M \
     PHP_MAX_EXECUTION_TIME=60 \
-    PHP_MEMORY_LIMIT=758M \
+    PHP_MEMORY_LIMIT=512M \
     PHP_SESSION_COOKIE_LIFETIME=0 \
     PHP_SESSION_GC_MAXLIFETIME=1440 \
     PHP_SESSION_HANDLER=files \
@@ -77,29 +107,6 @@ ENV PUID=${PUID} \
     PHP_FPM_RLIMIT_FILES=8192 \
     PHP_FPM_LOG_LIMIT=8192
 
-FROM base as system
-
-ARG USER=shopware
-ARG GROUP=shopware
-ARG PORT
-
-# install system dependencies (trurl & envsubst are pre-installed)
-RUN apk add --no-cache \
-    bash=~5.2 \
-    nginx=~1.26 \
-    supervisor=~4.2 \
-    jq=~1.7 \
-    trurl \
-    envsubst \
-    nodejs \
-    npm
-
-# create user and group
-RUN <<EOF
-adduser --system --uid ${PUID} ${USER}
-addgroup --system --gid ${PGID} ${GROUP}
-EOF
-
 # configure PHP
 RUN rm -rf /usr/local/etc/php/php.ini*
 COPY --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
@@ -121,26 +128,94 @@ COPY --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware
 RUN mkdir -p /etc/supervisor /etc/supervisor/conf.d
 COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
 
-# add container executables and library scripts
-COPY --chmod=755 docker/bin/swctl /usr/local/bin
-COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
-
 # create and own directories required by services
 RUN <<EOF
 mkdir -p /var/log/nginx /var/log/php-fpm /var/log/supervisor /var/www/html /run/php
 chmod -R 755 /run/php
-chown -R ${USER}:${GROUP} /var/log/nginx /var/lib/nginx /var/log/php-fpm /var/log/supervisor /var/www/html /run/php
+chown -R 82:82 /var/log/nginx /var/lib/nginx /var/log/php-fpm /var/log/supervisor /var/www/html /run/php
 EOF
+
+FROM base as system
+
+ARG PORT
+
+# add container executables and library scripts
+COPY --chmod=755 docker/bin/swctl /usr/local/bin
+COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
+
+# add a healthcheck
+# ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
+HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
+   CMD curl --fail "http://localhost:${PORT:-9161}/api/_info/health-check" || exit 1
+
+# prepare image for volumes - has to be done before we copy sources
+VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
+# create and own directories required by volumes
+RUN <<EOF
+mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
+chown -R 82:82 /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
+EOF
+
+# 'build' stage is analogous to 'dev'
+FROM system as dev
+
+# install shopware-cli
+RUN apk add --no-cache bash && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
+    apk add --no-cache shopware-cli
+
+# copy all (non-ignored) sources
+WORKDIR /var/www/html
+COPY --link --chown=82:82 . ./
+RUN rm -rf ./docker # remove non-ignorable docker dir
+
+# provide your own envs - we only set what's required
+ENV APP_ENV=dev \
+    LOCK_DSN=flock
+
+RUN --mount=type=secret,id=composer_auth,dst=./auth.json \
+    --mount=type=cache,target=/root/.composer \
+    --mount=type=cache,target=/root/.npm \
+    shopware-cli project ci --with-dev-dependencies .
+
+## just start the server
+USER www-data
+
+ENTRYPOINT ["swctl", "run"]
+
+# build without dev deps
+FROM dev as build
+
+WORKDIR /app
+
+# switch back to build
+USER root
+
+# prod build - provide your own envs
+ENV APP_ENV=prod \
+    LOCK_DSN=flock \
+    APP_URL="https://shopware.internal" \
+    APP_URL_CHECK_DISABLED=1 \
+    DATABASE_URL=mysql://shopware:shopware@127.0.0.1:3306/shopware
+
+RUN rm -rf /app/vendor # remove old (dev) dependencies
+RUN --mount=type=secret,id=composer_auth,dst=/app/auth.json \
+    --mount=type=cache,target=/root/.composer \
+    --mount=type=cache,target=/root/.npm \
+    shopware-cli project ci /app
+
+# final prod image
+FROM system as prod
 
 # set default Shopware environment variables
 ENV APP_ENV=prod \
     APP_SECRET="" \
-    APP_URL="http://localhost:${PORT}" \
-    APP_URL_CHECK_DISABLED=1 \
+    APP_URL="https://shopware.internal" \
+    APP_URL_CHECK_DISABLED=0 \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
     MAILER_DSN=null://null \
-    DATABASE_URL=mysql://shopware:shopware@localhost:3306/shopware \
+    DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware \
     OPENSEARCH_URL="" \
     BLUE_GREEN_DEPLOYMENT=0 \
     SHOPWARE_ES_ENABLED=0 \
@@ -152,7 +227,7 @@ ENV APP_ENV=prod \
     SHOPWARE_CACHE_ID=docker \
     SHOPWARE_SKIP_WEBINSTALLER=1 \
     COMPOSER_PLUGIN_LOADER=1 \
-    COMPOSER_HOME="/var/www/html/var/cache/composer" \
+    COMPOSER_HOME="/tmp/composer" \
     OTEL_PHP_AUTOLOAD_ENABLED=false \
     OTEL_PHP_DISABLED_INSTRUMENTATIONS=shopware \
     OTEL_SERVICE_NAME=shopware \
@@ -166,54 +241,13 @@ ENV APP_ENV=prod \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
 
-# add a healthcheck
-# ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
-HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
-   CMD curl --fail "http://localhost:${PORT:-9161}/api/_info/health-check" || exit 1
-
-# prepare image for volumes - has to be done before we copy sources
-VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
-
-# 'build' stage is analogous to 'dev'
-FROM system as dev
-
-ARG USER
-ARG GROUP
-
-# copy all sources
-WORKDIR /var/www/html
-RUN chown -R ${USER}:${GROUP} ./
-COPY --link --chown=${USER}:${GROUP} . ./
-RUN composer install --prefer-dist --no-interaction
-
-# just start the server
-ENTRYPOINT ["swctl", "start"]
-
-FROM dev as build
-
-ARG USER
-ARG GROUP
-
-# build assets & install dependencies
-COPY --from=dev --chown=${USER}:${GROUP} /var/www/html ./
-RUN --mount=type=secret,id=composer_auth,dst=./auth.json \
-    --mount=type=cache,target=/root/.composer \
-    --mount=type=cache,target=/root/.npm \
-    CI=1 ./bin/build-administration.sh && \
-    bin/build-storefront.sh \
-
-RUN rm -rf ./docker # remove non-ignorable docker dir
-
-FROM system as final
-
-ARG USER
-ARG GROUP
-
 # doc-root
 WORKDIR /var/www/html
 
-COPY --from=build --chown=${USER}:${GROUP} /var/www/html ./
+# perms
+RUN chown -R 82:82 .
+COPY --from=build --chown=82:82 /app ./
 
+# uid/gid 82
+USER www-data
 ENTRYPOINT ["swctl", "run"]
-
-USER ${USER}:${GROUP}
