@@ -7,7 +7,8 @@
     "mailpit.shopware.internal",
     "phpmyadmin.shopware.internal",
     "grafana.shopware.internal",
-    "prometheus.shopware.internal"
+    "prometheus.shopware.internal",
+    "minio.shopware.internal"
   ],
   "key": {
     "algo": "ecdsa",

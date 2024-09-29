@@ -34,6 +34,7 @@ ${CONFIG_START}
 127.0.0.1               phpmyadmin.shopware.internal                  # PHPMyAdmin
 127.0.0.1               grafana.shopware.internal                     # Grafana
 127.0.0.1               prometheus.shopware.internal                  # Prometheus
+127.0.0.1               minio.shopware.internal                       # MinIO
 
 ${CONFIG_END}
 EOF
