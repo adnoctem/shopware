@@ -16,6 +16,7 @@ build:
   disable_asset_copy: false
   keep_source_maps: false
   browserslist: 'cover 99.5%, >= 0.5% and not dead, last 2 versions'
+
 #sync:
 #  config:
 #    - settings:
