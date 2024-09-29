@@ -33,11 +33,10 @@ ctl_init() {
 	database_connection_check
 	if pc system:is-installed; then
 		shopware_setup
-		shopware_install_extensions
 	else
 		shopware_install
-		shopware_install_extensions
 	fi
+	shopware_install_extensions
 	shopware_clear_cache
 }
 
@@ -49,9 +48,17 @@ ctl_start() {
 }
 
 # ----------------------
+#   'deps' function
+# ----------------------
+ctl_deps() {
+  shopware_install_dependencies
+}
+
+# ----------------------
 #   'build' function
 # ----------------------
 ctl_build() {
+  database_connection_check
   shopware_build_storefront
   shopware_build_administration
 }
@@ -64,7 +71,12 @@ main() {
 
 	case "${cmd}" in
 	build)
+	  ctl_deps
 	  ctl_build
+	  return $?
+	  ;;
+	deps)
+	  ctl_deps
 	  return $?
 	  ;;
 	init)
@@ -76,7 +88,6 @@ main() {
 		return $?
 		;;
 	run)
-	  # ctl_build
 		ctl_init
 		ctl_start
 		return $?
