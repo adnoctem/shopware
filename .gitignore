@@ -4,6 +4,14 @@
 /vendor/
 *.txt
 
+# do not store Shopware plugins or apps in this repository, as they
+# should be managed through Comopser entirely. if a Composer installation
+# isn't offered for a required plugin, we use concoct
+/custom/apps/**
+!/custom/apps/.gitkeep
+/custom/plugins/**
+!/custom/plugins/.gitkeep
+
 ###> shopware/core ###
 # env config
 .env.*
@@ -23,7 +31,7 @@
 !/var/.htaccess
 /secrets/
 
-# wtf? came with the composer template
+# sensitive information
 /auth.json
 /install.lock
 public/asset-manifest.json
