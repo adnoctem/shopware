@@ -88,34 +88,43 @@ jobs:
             echo "COMPOSER_ROOT_VERSION=${{ needs.version.outputs.version }}"
           } >> "$GITHUB_ENV"
 
-      - name: Install plugins and dependencies
+      - name: Install dependencies
         run: |
-          make ci
-          make dotenv CI=y
+          make init CI=y
 
-      - name: Create Docker Compose apps
+      - name: Create Shopware execution environment
         uses: hoverkraft-tech/compose-action@v2.0.1
         with:
-          compose-file: "./ci/compose.yml"
+          compose-file: "./docker/compose-ci.yml"
+          compose-flags: "--env-file ./env.test"
 
       - name: Run tests
         run: |
           make tests
 
-      - name: Check Git tag
-        id: check-tag
-        uses: mukunku/tag-exists-action@v1.6.0
-        with:
-          tag: 'v${{ needs.version.outputs.version }}'
-
-      - name: Create tag
-        if: steps.check-tag.outputs.exists == 'false'
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+    needs: [ test ]
+    steps:
+      - name: Dispatch a release workflow run
+        if: ${{ always() && contains(join(needs.*.result, ','), 'success') }} # ref: https://github.com/actions/runner/issues/1251
         uses: actions/github-script@v7
         with:
+          github-token: "${{ env.GITHUB_TOKEN }}"
           script: |
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'refs/tags/v${{ needs.version.outputs.version }}',
-              sha: context.sha
-            })
+            const payload = {
+              run_id: "${{ github.run_id }}",
+              sha: "${{ github.sha }}"
+            }
+
+            console.log("Sending event payload", JSON.stringify(payload, null, 2));
+
+            const { owner, repo } = context.repo;
+            await github.rest.repos.createDispatchEvent({
+              owner,
+              repo,
+              event_type: 'release',
+              client_payload: payload
+            });
