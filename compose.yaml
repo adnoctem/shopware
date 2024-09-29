@@ -39,6 +39,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: dev
     restart: always
     ports:
       - "9161"
@@ -81,7 +82,7 @@ services:
         condition: service_started
 
   mysql:
-    image: mysql:${MYSQL_VERSION:-8}-oracle
+    image: mysql:${MYSQL_VERSION:-8.0}-oracle
     container_name: mysql
     restart: always
     ports:
@@ -93,6 +94,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
+      # - ./docker/conf/mysql:/etc/mysql/conf.d
       # - secrets/backup.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - internal
@@ -145,7 +147,7 @@ services:
       opensearch.password: shopware
     networks:
       - public
-      - internal
+      - internal # needs opensearch access
     labels:
       - "application=opensearch-dashboards"
       - "traefik.enable=true"
@@ -189,13 +191,14 @@ services:
     ports:
       - "8090"
     environment:
-      PMA_HOST: mysql
-      PMA_ARBITRARY: 1
-      PMA_ABSOLUTE_URI: https://phpmyadmin.shopware.internal
-      MYSQL_ROOT_PASSWORD: shopware
       APACHE_PORT: 8090
+      MYSQL_ROOT_PASSWORD: shopware
+      PMA_HOST: mysql
+      # PMA_ARBITRARY: 1
+      PMA_ABSOLUTE_URI: https://phpmyadmin.shopware.internal
     networks:
       - public
+      - internal # needs mysql access
     labels:
       - "application=phpmyadmin"
       - "traefik.enable=true"
@@ -208,11 +211,140 @@ services:
       - "traefik.http.routers.phpmyadmin.service=phpmyadmin"
       - "traefik.http.services.phpmyadmin.loadbalancer.server.port=8090"
 
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    ports:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    restart: unless-stopped
+    environment:
+      GF_INSTALL_PLUGINS: grafana-opensearch-datasource
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: true
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_SERVER_ROOT_URL: "https://grafana.shopware.internal"
+    networks:
+      - public
+      - internal # tempo, otel-c access
+    configs:
+      - source: grafana-datasources.yaml
+        target: /etc/grafana/provisioning/datasources/datasources.yaml
+    labels:
+      - "application=grafana"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.grafana.entrypoints=https"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.domains[0].main=grafana.shopware.internal"
+      - "traefik.http.routers.grafana.tls.domains[0].sans=*.grafana.shopware.internal"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.shopware.internal`)"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  # Tempo runs as user 10001, and docker compose creates the volume as root.
+  # As such, we need to chown the volume in order for Tempo to start correctly.
+  tempo-init:
+    image: grafana/tempo:latest
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - tempo-data:/var/tempo
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - tempo-data:/var/tempo
+    ports:
+      - "14268"  # jaeger ingest
+      - "3200"   # tempo
+      - "4317"  # otlp grpc
+      - "4318"  # otlp http
+      - "9411"   # zipkin
+    configs:
+      - source: tempo.yaml
+        target: /etc/tempo.yaml
+    networks:
+      - internal
+    depends_on:
+      - tempo-init
+    labels:
+      - "application=tempo"
+      - "traefik.enable=false"
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    configs:
+      - source: prometheus.yaml
+        target: /etc/prometheus.yaml
+    ports:
+      - "9090"
+    networks:
+      - public
+      - internal # otel-c access
+    labels:
+      - "application=prometheus"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.prometheus.entrypoints=https"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.domains[0].main=prometheus.shopware.internal"
+      - "traefik.http.routers.prometheus.tls.domains[0].sans=*.prometheus.shopware.internal"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.shopware.internal`)"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: otel-collector
+    restart: always
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    configs:
+      - source: otel-collector-config.yaml
+        target: /etc/otel-collector.yaml
+    ports:
+      - "4317" # OTLP gRPC receiver
+    networks:
+      - internal
+    depends_on:
+      - grafana
+      - tempo
+    labels:
+      - "application=otel-collector"
+      - "traefik.enable=false"
+
 configs:
   traefik.yml:
     file: docker/resources/traefik.yml
   traefik-dynamic.yml:
     file: docker/resources/traefik-dynamic.yml
+  grafana-datasources.yaml:
+    file: docker/resources/grafana-datasources.yaml
+  tempo.yaml:
+    file: docker/resources/tempo.yaml
+  prometheus.yaml:
+    file: docker/resources/prometheus.yaml
+  otel-collector-config.yaml:
+    file: docker/resources/otel-collector-config.yaml
 
 secrets:
   server.pem:
@@ -228,6 +360,7 @@ volumes:
   sw-sitemap:
   db-data:
   opensearch-data:
+  tempo-data:
 
 networks:
   public:
