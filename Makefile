@@ -95,9 +95,14 @@ EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commi
 # User-defined variables
 # ---------------------------
 PRINT_HELP ?=
+ENV ?= dev
 TAG ?= $(VERSION)
 APP ?= shopware
 CI ?= n
+
+# Docker image
+PHP_VERSION ?= 8.2
+PORT ?= 9161
 
 # ---------------------------
 # Custom functions
@@ -146,20 +151,22 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init: deps secrets compose-network
-endif
-
-define CI_INFO
-# Initialize the project in CI mode.
-#
-# See the target's prerequisites for information about the commands executed.
-endef
-.PHONY: ci
-ifeq ($(PRINT_HELP), y)
-ci:
-	echo "$$CI_INFO"
+init:
+ifeq ($(CI), y)
+	$(call log_notice, "Installing Composer dependencies")
+	@$(MAKE) deps
 else
-ci: deps
+	$(call log_notice, "Installing Composer dependencies")
+	@$(MAKE) deps
+	$(call log_notice, "Generating TLS certificates")
+	@$(MAKE) secrets
+	$(call log_notice, "Creating Docker Compose networks")
+	@$(MAKE) compose-network
+	$(call log_notice, "Bootstrapping /etc/hosts for custom hostnames")
+	@$(MAKE) bootstrap
+	$(call log_notice, "Generating new custom .env.local file from .env")
+	@$(MAKE) dotenv
+endif
 endif
 
 define ENV_INFO
@@ -178,7 +185,7 @@ ifeq ($(PRINT_HELP), y)
 env:
 	echo "$$ENV_INFO"
 else
-env: dotenv bootstrap compose-network compose
+env: compose
 endif
 
 define ENV_CLEANUP_INFO
@@ -192,7 +199,7 @@ ifeq ($(PRINT_HELP), y)
 env-cleanup:
 	echo "$$ENV_CLEANUP_INFO"
 else
-env-cleanup: prune-compose prune-compose-network prune-bootstrap
+env-cleanup: prune-compose
 endif
 
 define TESTS_INFO
@@ -234,8 +241,14 @@ image:
 	echo "$$IMAGE_INFO"
 else
 image:
+	$(call log_notice, "Setting up local infrastructure...")
+	$(MAKE) compose CI=y
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
-	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest .
+	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest \
+ 		--target $(ENV) \
+	 	--build-arg PHP_VERSION=$(PHP_VERSION) \
+	 	--build-arg PORT=$(PORT) .
+	$(MAKE) prune-compose CI=y
 endif
 
 define BUNDLE_INFO
@@ -283,11 +296,6 @@ bootstrap:
 	$(call log_notice, "Bootstrapping host machine DNS entries!")
 	@$(SCRIPT_DIR)/hosts.sh add
 
-#.PHONY: buildenv
-#buildenv:
-#	$(call log_notice, "Starting Shopware build environment!")
-#	@$(docker) compose -f docker/compose.yaml up -d
-
 .PHONY: dumps
 dumps:
 	$(call log_notice, "Dumping Shopware\'s static build information")
@@ -312,9 +320,13 @@ stop:
 .PHONY: compose
 compose:
 	$(call log_notice, "Starting Docker Compose project")
-	@$(docker) compose -f docker/compose-override.yaml up -d
+ifeq ($(CI), y)
+	@$(docker) compose -f docker/compose-ci.yaml up -d
+else
+	@$(docker) compose -f compose.yaml up -d --build
 	@sleep 5
 	@$(MAKE) logs APP=shopware
+endif
 
 .PHONY: compose-network
 compose-network:
@@ -348,9 +360,8 @@ logs:
 .PHONY: dotenv
 dotenv:
 ifeq ($(shell test -e .env.local && echo -n yes), yes)
-	$(call log_attention, "Saving Shopware-generated .env.local as .env.local.bak!")
-	@cp .env.local .env.local.bak
-endif
+	$(call log_attention, "Skipping generation of .env.local: file exists!")
+else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
 	@cp .env .env.local
 	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env.local
@@ -361,7 +372,7 @@ endif
 	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:8000/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env.local
 	@sed -i -e "s/OPENSEARCH_URL=http:\/\/127.0.0.1:9200/OPENSEARCH_URL=http:\/\/opensearch:9200/g" .env.local
 	@sed -i -e "s/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127.0.0.1:4317/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/otel-collector:4317/g" .env.local
-
+endif
 
 # Generate the TLS CA certificate to create and sign server certificates for Traefik
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
@@ -422,20 +433,19 @@ prune-bootstrap:
 .PHONY: prune-compose
 prune-compose:
 	$(call log_attention, "Stopping Docker Compose project!")
-	@$(docker) compose -f docker/compose-override.yaml down -v
+ifeq ($(CI), y)
+	@$(docker) compose -f docker/compose-ci.yaml down -v
+else
+	@$(docker) compose -f compose.yaml down -v
+endif
 
 .PHONY: prune-compose-network
 prune-compose-network:
 	$(call log_attention, "Removing public Docker Compose network!")
 	@$(docker) network rm public --force
 
-#.PHONY: prune-buildenv
-#prune-buildenv:
-#	$(call log_attention, "Removing Shopware build environment!")
-#	@$(docker) compose -f docker/compose.yaml down -v
-
 .PHONY: prune-files
-prune-files: prune-secrets prune-output prune-deps prune-env prune-var prune-public prune-install prune-theme
+prune-files: prune-secrets prune-output prune-deps prune-var prune-public prune-install prune-theme
 
 .PHONY: prune-secrets
 prune-secrets:
@@ -451,11 +461,6 @@ prune-output:
 prune-deps:
 	$(call log_attention, "Removing Shopware dependencies in $(DEPENDENCY_DIR)!")
 	rm -rf $(DEPENDENCY_DIR)
-
-.PHONY: prune-env
-prune-env:
-	$(call log_attention, "Cleaning up Shopware var directory in $(VAR_DIR)!")
-	rm -rf $(ROOT_DIR)/.env.local*
 
 .PHONY: prune-var
 prune-var:
