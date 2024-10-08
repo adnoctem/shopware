@@ -63,7 +63,7 @@ APPS_DIR := $(ROOT_DIR)/custom/apps
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
-DOCKERFILE := $(DOCKER_DIR)/Dockerfile
+DOCKERFILE := $(ROOT_DIR)/Dockerfile
 ENV_FILE := $(ROOT_DIR)/.env
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
