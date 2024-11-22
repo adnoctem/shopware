@@ -7,6 +7,7 @@
     "ext-opentelemetry": "*",
     "composer-runtime-api": "^2.0",
     "frosh/tools": "^2.3",
+    "league/flysystem-async-aws-s3": "^3.29",
     "open-telemetry/exporter-otlp": "^1.0",
     "open-telemetry/transport-grpc": "^1.0",
     "shopware/administration": "^6.6",

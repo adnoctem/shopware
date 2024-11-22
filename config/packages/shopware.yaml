@@ -14,5 +14,5 @@ shopware:
     enabled: false
 
   admin_worker:
-    # The Admin worker should be disabled on production server.
+    # The admin worker should be disabled on server, as we're spawning separate PHP CLI workers
     enable_admin_worker: false

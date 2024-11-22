@@ -1,0 +1,66 @@
+# Using the web-updater would overwrite this file, requiring a second file z-shopware.yaml to override the config
+# We toggled the updater with `shopware.auto_update.enabled = false`
+
+shopware:
+  # Configure Shopware to use S3 for all public images, local otherwise
+  filesystem:
+    public:
+      url: "%env(CDN_URL)%"
+      type: "amazon-s3"
+      config:
+        bucket: "%env(S3_BUCKET)%"
+        region: "%env(S3_REGION)%"
+        endpoint: "%env(S3_ENDPOINT)%"
+        # use_path_style_endpoint: true
+        options:
+          visibility: "public"
+          credentials:
+            key: "%env(S3_ACCESS_KEY)%"
+            secret: "%env(S3_SECRET_KEY)%"
+    theme:
+      type: "local"
+      url: "https://%env(APP_URL)%/public"
+      config:
+        root: "%kernel.project_dir%/public"
+    asset:
+      type: "local"
+      url: "https://%env(APP_URL)%/public"
+      config:
+        root: "%kernel.project_dir%/public"
+    sitemap:
+      type: "local"
+      url: "https://%env(APP_URL)%/public"
+      config:
+        root: "%kernel.project_dir%/public"
+
+  # Configure rate-limiting for all admin-facing endpoints
+  rate_limiter:
+    # Storefront (customer-facing) endpoints
+    login:
+      enabled: false
+    guest_login:
+      enabled: false
+    reset_password:
+      enabled: false
+    contact_form:
+      enabled: false
+    # API/Administration logins
+    oauth:
+      enabled: true
+      policy: 'time_backoff'
+      reset: '24 hours'
+      limits:
+        - limit: 5
+          interval: '10 seconds'
+        - limit: 10
+          interval: '60 seconds'
+    # Administration user password recovery
+    user_recovery:
+      enabled: true
+      policy: 'time_backoff'
+      reset: '24 hours'
+      limits:
+        - limit: 3
+          interval: '10 seconds'
+        - limit: 5
+          interval: '60 seconds'
