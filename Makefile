@@ -80,7 +80,7 @@ GIT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1) 
 VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo v0.1.0)))
 NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
 
-# Executables
+# executables
 docker := docker
 php := php # at least version 8.2
 composer := composer
@@ -335,7 +335,7 @@ dumps:
 .PHONY: start
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
-	@$(docker) compose -f docker/compose.yaml up -d
+	@$(docker) compose -f docker/cluster/compose.yaml up -d
 	@symfony server:start -d --no-tls --port=$(PORT)
 	@symfony server:log
 
@@ -344,16 +344,16 @@ stop:
 	$(call log_notice, "Stopping Shopware on local Symfony development server!")
 	@symfony server:stop
 	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
-	@$(docker) compose -f docker/compose.yaml down -v
+	@$(docker) compose -f docker/cluster/compose.yaml down
 
 .ONESHELL:
 .PHONY: compose
 compose: dotenv
 	$(call log_notice, "Starting Docker Compose project")
 ifeq ($(CI), y)
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose-ci.yaml up -d
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose-base.yaml up -d
 else
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose.yaml up -d --build
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose.yaml up -d --build
 	@sleep 5
 	@$(MAKE) logs APP=shopware
 endif
@@ -477,9 +477,9 @@ prune-bootstrap:
 prune-compose:
 	$(call log_attention, "Stopping Docker Compose project!")
 ifeq ($(CI), y)
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose-ci.yaml down -v
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose-base.yaml down -v
 else
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/compose.yaml down -v
+	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose.yaml down -v
 endif
 
 .PHONY: prune-compose-network

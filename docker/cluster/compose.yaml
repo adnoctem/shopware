@@ -35,10 +35,10 @@ services:
   shopware:
     image: fmjstudios/shopware:latest
     container_name: shopware
-    env_file: ../.env
+    env_file: ../../.env
     build:
-      context: ..
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: ../../Dockerfile
       target: dev
     restart: always
     ports:
@@ -396,23 +396,23 @@ services:
 
 configs:
   traefik.yml:
-    file: resources/traefik.yml
+    file: ../resources/traefik.yml
   traefik-dynamic.yml:
-    file: resources/traefik-dynamic.yml
+    file: ../resources/traefik-dynamic.yml
   grafana-datasources.yaml:
-    file: resources/grafana-datasources.yaml
+    file: ../resources/grafana-datasources.yaml
   tempo.yaml:
-    file: resources/tempo.yaml
+    file: ../resources/tempo.yaml
   prometheus.yaml:
-    file: resources/prometheus.yaml
+    file: ../resources/prometheus.yaml
   otel-collector-config.yaml:
-    file: resources/otel-collector-config.yaml
+    file: ../resources/otel-collector-config.yaml
 
 secrets:
   server.pem:
-    file: ../secrets/ssl/server.pem
+    file: ../../secrets/ssl/server.pem
   server-key.pem:
-    file: ../secrets/ssl/server-key.pem
+    file: ../../secrets/ssl/server-key.pem
 
 volumes:
   sw-files:
