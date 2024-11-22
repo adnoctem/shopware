@@ -141,7 +141,7 @@ function php::configure() {
 
   # Shopware requires at least 512MB
   log::green "Configuring PHP memory_limit!"
-  if ! sed -i 's/memory_limit\s*=.*/memory_limit=768M/g' "${ini}"; then
+  if ! sed -i 's/memory_limit\s*=.*/memory_limit=512M/g' "${ini}"; then
     log::red "Could not configure PHP memory_limit for php.ini: ${ini}!"
   fi
   log::green "Configured PHP memory_limit for php.ini: ${ini}!"
@@ -210,7 +210,7 @@ function main() {
 		;;
 	*)
 		log::red "Unknown command: ${cmd}. See 'help' command for usage information:"
-		hosts::usage
+		php::usage
 		return 1
 		;;
 	esac
