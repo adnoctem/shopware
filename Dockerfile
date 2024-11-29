@@ -147,6 +147,11 @@ mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/med
 chown -R ${USER}:${USER} /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
 EOF
 
+# install shopware-cli
+RUN apk add --no-cache bash && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
+    apk add --no-cache shopware-cli
+
 # execute 'swctl' by default
 ENTRYPOINT ["swctl"]
 
@@ -159,11 +164,6 @@ FROM system as dev
 ARG USER
 ARG PUID
 ARG PGID
-
-# install shopware-cli
-RUN apk add --no-cache bash && \
-    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
-    apk add --no-cache shopware-cli
 
 # copy all (non-ignored) sources
 WORKDIR /var/www/html
@@ -188,7 +188,7 @@ USER ${USER}
 CMD ["run"]
 
 # build without dev deps
-FROM dev as build
+FROM system as build
 
 WORKDIR /app
 COPY --from=dev /var/www/html /app
@@ -203,13 +203,16 @@ ENV APP_ENV=prod \
     APP_URL_CHECK_DISABLED=1 \
     DATABASE_URL=mysql://shopware:shopware@mysql:3306/shopware
 
+# remove old (dev) dependencies
+#RUN rm -rf /app/vendor
+
+# production build
 RUN \
-    # remove old (dev) dependencies
-    rm -rf /app/vendor; \
     --mount=type=secret,id=composer_auth,dst=/app/auth.json \
     --mount=type=cache,target=/root/.composer \
     --mount=type=cache,target=/root/.npm \
-    shopware-cli project ci /app
+    shopware-cli project ci .
+
 
 # -------------------------------------
 # PRODUCTION Image
@@ -267,6 +270,14 @@ ENV APP_ENV=prod \
 # perms
 RUN chown -R ${PUID}:${PGID} .
 COPY --from=build --chown=${PUID}:${PGID} /app ./
+
+RUN \
+    # (re)-own files
+    find /app -type f -exec chmod 644 {} + && \
+    find /app -type d -exec chmod 755 {} + && \
+    setfacl -R -m u:${USER}:rwX -m u:${USER}:rwX ./var && \
+    setfacl -dR -m u:${USER}:rwX -m u:${USER}:rwX ./var && \
+    chown -R $PUID:$PGID /app
 
 USER ${USER}
 CMD ["run"]

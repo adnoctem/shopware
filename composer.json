@@ -57,8 +57,8 @@
   },
   "scripts": {
     "dev": [
-      "@symfony server:start -d --no-tls",
-      "@symfony server:log"
+      "Composer\\Config::disableProcessTimeout",
+      "symfony server:start --no-tls --allow-http"
     ],
     "tests": [
       "phpunit"

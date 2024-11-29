@@ -274,6 +274,7 @@ else
 image: env
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
 	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest \
+		--network host \
  		--target $(ENV) \
 	 	--build-arg PHP_VERSION=$(PHP_VERSION) \
 	 	--build-arg PORT=$(PORT) .
