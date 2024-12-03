@@ -4,6 +4,7 @@
   "license": "MIT",
   "type": "project",
   "require": {
+    "ext-grpc": "*",
     "ext-opentelemetry": "*",
     "composer-runtime-api": "^2.0",
     "frosh/tools": "^2.3",

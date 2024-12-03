@@ -371,7 +371,10 @@ compose-network:
 .PHONY: deps
 deps:
 	$(call log_notice, "Installing project Composer dependencies")
-	@composer install --no-interaction
+	@composer install --no-interaction \
+		--ignore-platform-req=ext-opentelemetry \
+		--ignore-platform-req=ext-grpc \
+		--ignore-platform-req=php
 
 .PHONY: pre-commit
 pre-commit:

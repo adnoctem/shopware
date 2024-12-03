@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "29f8c046ed461c1276bf0ede867316f5",
+    "content-hash": "a364af37b1a0f372363ca893a8852de6",
     "packages": [
         {
             "name": "async-aws/core",
@@ -14473,6 +14473,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
+        "ext-grpc": "*",
         "ext-opentelemetry": "*",
         "composer-runtime-api": "^2.0"
     },

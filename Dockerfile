@@ -271,12 +271,11 @@ ENV APP_ENV=prod \
 RUN chown -R ${PUID}:${PGID} .
 COPY --from=build --chown=${PUID}:${PGID} /app ./
 
+# (re)-own filesc
 RUN \
-    # (re)-own files
     find /app -type f -exec chmod 644 {} + && \
     find /app -type d -exec chmod 755 {} + && \
-    setfacl -R -m u:${USER}:rwX -m u:${USER}:rwX ./var && \
-    setfacl -dR -m u:${USER}:rwX -m u:${USER}:rwX ./var && \
+    setfacl -PRdm -m u:${USER}:rwx g:${USER}:rw o::r ./files ./var ./public && \
     chown -R $PUID:$PGID /app
 
 USER ${USER}
