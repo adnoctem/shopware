@@ -62,11 +62,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Create .env
+        run: |
+          make dotenv
+
       - name: Create Shopware execution environment
         uses: hoverkraft-tech/compose-action@v2.0.1
         with:
-          compose-file: "./docker/compose-ci.yml"
-          compose-flags: "--env-file ./env.test"
+          compose-file: "./compose-ci.yml"
 
       - name: Docker metadata
         id: meta

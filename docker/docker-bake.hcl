@@ -24,9 +24,13 @@ variable "REPOSITORY" {
   default = "fmjstudios/shopware"
 }
 
+variable "DEFAULT_PHP" {
+  default = "8.3"
+}
+
 # build for multiple PHP versions - can be a comma-separated list of values like 7.4,8.1,8.2 etc.
 variable "PHP_VERSIONS" {
-  default = "8.2,8.3"
+  default = "8.2,${DEFAULT_PHP}"
 }
 
 # ==== Custom Functions ====
@@ -71,14 +75,6 @@ function "get_tags" {
   result = VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION])
 }
 
-function "build_tags" {
-  params = []
-  result = flatten(concat(
-    [for tag in get_tags() : "${REPOSITORY}:${tag}"],
-    [for registry in get_registry() : [for tag in get_tags() : "${registry}/${REPOSITORY}:${tag}"]]
-  ))
-}
-
 # determine in which we're going to append for the image
 function "get_registry" {
   params = []
@@ -91,17 +87,29 @@ function "tags" {
     php,
     suffix
   ]
-  result = flatten([
-    for registry in get_registry() :
+  result = flatten(concat(
     [
-      for tag in get_tags() :
-      concat(
-          tag == "latest" ? suffix == "-fcgi" ? ["${registry}/${REPOSITORY}:${tag}"] : [] : [],
-        ["${registry}/${REPOSITORY}:${tag}-${php}${suffix}"]
-      )
+      for tag in get_tags() : [
+        suffix == "-fcgi" ? php == "${DEFAULT_PHP}" ?
+        "${REPOSITORY}:${tag}" :
+        "${REPOSITORY}:${tag}-php${php}" :
+        "${REPOSITORY}:${tag}-php${php}${suffix}"
     ]
-  ])
+    ],
+    [
+      for registry in get_registry() :
+      [
+        for tag in get_tags() : [
+          suffix == "-fcgi" ? php == "${DEFAULT_PHP}" ?
+          "${registry}/${REPOSITORY}:${tag}" :
+          "${registry}/${REPOSITORY}:${tag}-php${php}" :
+          "${registry}/${REPOSITORY}:${tag}-php${php}${suffix}"
+      ]
+      ]
+    ]
+  ))
 }
+
 
 # ==== Bake Groups ====
 group "default" {
@@ -125,13 +133,14 @@ target "shopware" {
   }
   platforms = [
     "linux/amd64",
-    "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    #"linux/riscv64",
-    "linux/s390x",
-    "linux/386",
-    # "linux/ppc64le" gRPC doesn't build on ppc64le
+    # "linux/arm64",
+    # uncomment if required
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
+    # "linux/ppc64le"
   ]
   tags = tags(
     php,
@@ -146,7 +155,7 @@ target "shopware-nginx" {
   name       = "shopware-nginx-php${replace(php, ".", "-")}"
   dockerfile = "docker/nginx.Dockerfile"
   contexts = {
-    base = "docker-image://fmjstudios/shopware:v${VERSION}"
+    base = "docker-image://fmjstudios/shopware:latest"
   }
   matrix = {
     php = get_php_version()
@@ -157,11 +166,12 @@ target "shopware-nginx" {
   platforms = [
     "linux/amd64",
     "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    "linux/riscv64",
-    "linux/s390x",
-    "linux/386",
+    # uncomment if required
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
     # "linux/ppc64le"
   ]
   tags = tags(
@@ -177,7 +187,7 @@ target "shopware-caddy" {
   name       = "shopware-caddy-php${replace(php, ".", "-")}"
   dockerfile = "docker/caddy.Dockerfile"
   contexts = {
-    base = "docker-image://fmjstudios/shopware:v${VERSION}"
+    base = "docker-image://fmjstudios/shopware:latest"
   }
   matrix = {
     php = get_php_version()
@@ -188,11 +198,12 @@ target "shopware-caddy" {
   platforms = [
     "linux/amd64",
     "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    "linux/riscv64",
-    "linux/s390x",
-    "linux/386",
+    # uncomment if required
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
     # "linux/ppc64le"
   ]
   tags = tags(
