@@ -34,7 +34,6 @@ endif
 SHELL := /bin/bash
 
 export ROOT_DIR = $(shell git rev-parse --show-toplevel)
-export PROJ_NAME = $(shell basename "$(ROOT_DIR)")
 
 # Only export variables from here since we do not want to mix the top-level
 # Makefile's notion of 'SOURCES' with the different sub-makes
@@ -44,41 +43,41 @@ export
 # Constants
 # ---------------------------
 
-SCRIPT_DIR := $(ROOT_DIR)/scripts
+#SCRIPT_DIR := $(ROOT_DIR)/scripts
 CONFIG_DIR := $(ROOT_DIR)/config
-CONFIG_TLS_DIR := $(ROOT_DIR)/config/ssl
-DOCS_DIR := $(ROOT_DIR)/docs
+CONFIG_TLS_DIR := $(CONFIG_DIR)/ssl
+#DOCS_DIR := $(ROOT_DIR)/docs
 OUTPUT_DIR := $(ROOT_DIR)/dist
 SECRETS_DIR := $(ROOT_DIR)/secrets
-SECRETS_TLS_DIR := $(ROOT_DIR)/secrets/ssl
-DEPENDENCY_DIR := $(ROOT_DIR)/vendor
+SECRETS_TLS_DIR := $(SECRETS_DIR)/ssl
+VENDOR_DIR := $(ROOT_DIR)/vendor
 VAR_DIR := $(ROOT_DIR)/var
 PUBLIC_DIR := $(ROOT_DIR)/public
-DOCKER_DIR := $(ROOT_DIR)/docker
+#DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
 CI_LINTER_DIR := $(CI_DIR)/linters
-PLUGIN_DIR := $(ROOT_DIR)/custom/plugins
-APPS_DIR := $(ROOT_DIR)/custom/apps
+#PLUGIN_DIR := $(ROOT_DIR)/custom/plugins
+#APPS_DIR := $(ROOT_DIR)/custom/apps
 
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
-DOCKERFILE := $(ROOT_DIR)/Dockerfile
-ENV_FILE := $(ROOT_DIR)/.env
+#DOCKERFILE := $(ROOT_DIR)/Dockerfile
+#ENV_FILE := $(ROOT_DIR)/.env
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
 TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./secrets' --exclude='./.github' --exclude='./dist' --exclude-from'=./.gitignore'
-PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
-APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
+#PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
+#APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
 
-COMPOSE_SUBNET := 172.25.0.0/16
-COMPOSE_GATEWAY_IP := 172.25.0.1
+#COMPOSE_SUBNET := 172.25.0.0/16
+#COMPOSE_GATEWAY_IP := 172.25.0.1
 
 # general variables
-DATE := $(shell date '+%d.%m.%y-%T')
+#DATE := $(shell date '+%d.%m.%y-%T')
 GIT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null)
-VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo v0.1.0)))
-NAME := $(shell composer show --self | grep 'names' | grep -o -E '\w+/\w+' | cut -d' ' -f 2)
+VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo 0.1.0)))
+NAME := $(shell jq -r '.name' $(ROOT_DIR)/composer.json)
 
 # executables
 docker := docker
@@ -96,7 +95,7 @@ EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commi
 # ---------------------------
 PRINT_HELP ?=
 ENV ?= dev
-TAG ?= $(VERSION)
+TAG ?= v$(VERSION)
 APP ?= shopware
 CI ?= n
 
@@ -151,24 +150,24 @@ ifeq ($(PRINT_HELP), y)
 init:
 	echo "$$INIT_INFO"
 else
-init:
-ifeq ($(CI), y)
-	$(call log_notice, "Installing Composer dependencies")
-	@$(MAKE) deps
-	$(call log_notice, "Generating new custom .env.local file from .env")
-	@$(MAKE) dotenv ENV=test
-else
-	$(call log_notice, "Installing Composer dependencies")
-	@$(MAKE) deps
-	$(call log_notice, "Generating TLS certificates")
-	@$(MAKE) secrets
-	$(call log_notice, "Creating Docker Compose networks")
-	@$(MAKE) compose-network
-	$(call log_notice, "Bootstrapping /etc/hosts for custom hostnames")
-	@$(MAKE) bootstrap
-	$(call log_notice, "Generating new custom .env.local file from .env")
-	@$(MAKE) dotenv
-endif
+init: deps dotenv
+#ifeq ($(CI), y)
+#	$(call log_notice, "Installing Composer dependencies")
+#	@$(MAKE) deps
+#	$(call log_notice, "Generating new custom .env.local file from .env")
+#	@$(MAKE) dotenv ENV=test
+#else
+#	$(call log_notice, "Installing Composer dependencies")
+#	@$(MAKE) deps
+#	$(call log_notice, "Generating TLS certificates")
+#	@$(MAKE) secrets
+#	$(call log_notice, "Creating Docker Compose networks")
+#	@$(MAKE) compose-network
+#	$(call log_notice, "Bootstrapping /etc/hosts for custom hostnames")
+#	@$(MAKE) bootstrap
+#	$(call log_notice, "Generating new custom .env.local file from .env")
+#	@$(MAKE) dotenv
+#endif
 endif
 
 define ENV_INFO
@@ -181,14 +180,14 @@ define ENV_INFO
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
 endef
-.PHONY: env
-ifeq ($(PRINT_HELP), y)
-env:
-	echo "$$ENV_INFO"
-else
-env:
-	@$(MAKE) compose CI=y
-endif
+#.PHONY: env
+#ifeq ($(PRINT_HELP), y)
+#env:
+#	echo "$$ENV_INFO"
+#else
+#env:
+#	@$(MAKE) compose CI=y
+#endif
 
 define DEV_INFO
 # Manage the development environment for Shopware 6. This creates a local Docker Compose
@@ -201,14 +200,14 @@ define DEV_INFO
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
 endef
-.PHONY: dev
-ifeq ($(PRINT_HELP), y)
-dev:
-	echo "$$DEV_INFO"
-else
-dev:
-	@$(MAKE) compose
-endif
+#.PHONY: dev
+#ifeq ($(PRINT_HELP), y)
+#dev:
+#	echo "$$DEV_INFO"
+#else
+#dev:
+#	@$(MAKE) compose
+#endif
 
 define DEV_CLEANUP_INFO
 # Clean up the development environment for Shopware 6.
@@ -216,28 +215,28 @@ define DEV_CLEANUP_INFO
 # Arguments:
 #   PRINT_HELP: 'y' or 'n'
 endef
-.PHONY: clean
-ifeq ($(PRINT_HELP), y)
-clean:
-	echo "$$DEV_CLEANUP_INFO"
-else
-clean:
-	@$(MAKE) prune-compose CI=$(CI)
-endif
+#.PHONY: clean
+#ifeq ($(PRINT_HELP), y)
+#clean:
+#	echo "$$DEV_CLEANUP_INFO"
+#else
+#clean:
+#	@$(MAKE) prune-compose CI=$(CI)
+#endif
 
 define TESTS_INFO
 # Run tests for Shopware using PHPUnit. This does basic validation that the application
 # still boots and runs with our current configuration.
 endef
-.PHONY: tests
-ifeq ($(PRINT_HELP), y)
-tests:
-	echo "$$TESTS_INFO"
-else
-tests:
-	@$(MAKE) dotenv ENV=test
-	@composer run tests
-endif
+#.PHONY: tests
+#ifeq ($(PRINT_HELP), y)
+#tests:
+#	echo "$$TESTS_INFO"
+#else
+#tests:
+#	@$(MAKE) dotenv ENV=test
+#	@composer run tests
+#endif
 
 define PRUNE_INFO
 # Remove the local configuration
@@ -246,18 +245,18 @@ define PRUNE_INFO
 # target which requires the 'dev-cluster' and 'dev-cluster-bootstrap' Make
 # targets.
 endef
-.PHONY: prune
-ifeq ($(PRINT_HELP), y)
-prune:
-	echo "$$PRUNE_INFO"
-else
-prune:
-	@$(MAKE) prune-bootstrap
-	@$(MAKE) prune-compose
-	@$(MAKE) prune-compose CI=y
-	@$(MAKE) prune-compose-network
-	@$(MAKE) prune-files
-endif
+#.PHONY: prune
+#ifeq ($(PRINT_HELP), y)
+#prune:
+#	echo "$$PRUNE_INFO"
+#else
+#prune:
+#	@$(MAKE) prune-bootstrap
+#	@$(MAKE) prune-compose
+#	@$(MAKE) prune-compose CI=y
+#	@$(MAKE) prune-compose-network
+#	@$(MAKE) prune-files
+#endif
 
 # ---------------------------
 #   Shopware Targets
@@ -271,14 +270,12 @@ ifeq ($(PRINT_HELP), y)
 image:
 	echo "$$IMAGE_INFO"
 else
-image: env
+image:
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
-	-$(docker) buildx build -f $(DOCKERFILE) -t $(NAME):$(TAG) -t $(NAME):latest \
+	-$(docker) buildx build -t $(NAME):$(TAG) -t $(NAME):latest \
 		--network host \
  		--target $(ENV) \
-	 	--build-arg PHP_VERSION=$(PHP_VERSION) \
-	 	--build-arg PORT=$(PORT) .
-	$(MAKE) prune-compose CI=y
+	 	--build-arg PHP_VERSION=$(PHP_VERSION) .
 endif
 
 define BUNDLE_INFO
@@ -305,69 +302,55 @@ define SECRETS_INFO
 # Arguments:
 #	PRINT_HELP: 'y' or 'n'
 endef
-.PHONY: secrets
-ifeq ($(PRINT_HELP), y)
-secrets:
-	echo "$$SECRETS_INFO"
-else
-secrets: secrets-dir secrets-gen-ca secrets-gen-server
-ifeq ($(shell test -e /tmp/sw-backup.sql && echo -n yes ), yes)
-	$(call log_attention, "Found Shopware backup.sql in /tmp! Importing into secrets...")
-	@mv /tmp/sw-backup.sql $(SECRETS_DIR)/backup.sql
-endif
-endif
+#.PHONY: secrets
+#ifeq ($(PRINT_HELP), y)
+#secrets:
+#	echo "$$SECRETS_INFO"
+#else
+#secrets: secrets-dir secrets-gen-ca secrets-gen-server
+#ifeq ($(shell test -e /tmp/sw-backup.sql && echo -n yes ), yes)
+#	$(call log_attention, "Found Shopware backup.sql in /tmp! Importing into secrets...")
+#	@mv /tmp/sw-backup.sql $(SECRETS_DIR)/backup.sql
+#endif
+#endif
 
 # ---------------------------
 #   Dependencies
 # ---------------------------
 # setup
-.PHONY: bootstrap
-bootstrap:
-	$(call log_notice, "Bootstrapping host machine DNS entries!")
-	@$(SCRIPT_DIR)/hosts.sh add
-
-.PHONY: dumps
-dumps:
-	$(call log_notice, "Dumping Shopware\'s static build information")
-	php bin/console theme:dump
-	php bin/console feature:dump
-	php bin/console bundle:dump
+#.PHONY: bootstrap
+#bootstrap:
+#	$(call log_notice, "Bootstrapping host machine DNS entries!")
+#	@$(SCRIPT_DIR)/hosts.sh add
 
 .PHONY: start
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
-	@$(docker) compose -f docker/cluster/compose.yaml up -d
-	@symfony server:start -d --no-tls --port=$(PORT)
+	@$(docker) compose up -d
+	@symfony server:start -d --no-tls --allow-http
 	@symfony server:log
 
 .PHONY: stop
 stop:
 	$(call log_notice, "Stopping Shopware on local Symfony development server!")
 	@symfony server:stop
-	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
-	@$(docker) compose -f docker/cluster/compose.yaml down
+	@$(docker) compose down
 
-.ONESHELL:
-.PHONY: compose
-compose: dotenv
-	$(call log_notice, "Starting Docker Compose project")
-ifeq ($(CI), y)
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose-base.yaml up -d
-else
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose.yaml up -d --build
-	@sleep 5
-	@$(MAKE) logs APP=shopware
-endif
+#.PHONY: compose
+#compose:
+#	$(call log_notice, "Starting Docker Compose project")
+#	@$(docker) compose up -d
 
-.PHONY: compose-network
-compose-network:
-	$(call log_notice, "Creating Docker Compose networks")
-	@$(docker) network rm public --force
-	@$(docker) network create \
-		--subnet $(COMPOSE_SUBNET) \
-		--gateway $(COMPOSE_GATEWAY_IP) \
-		public
+#.PHONY: compose-network
+#compose-network:
+#	$(call log_notice, "Creating Docker Compose networks")
+#	@$(docker) network rm public --force
+#	@$(docker) network create \
+#		--subnet $(COMPOSE_SUBNET) \
+#		--gateway $(COMPOSE_GATEWAY_IP) \
+#		public
 
+# ignore extensions for dependency installations
 .PHONY: deps
 deps:
 	$(call log_notice, "Installing project Composer dependencies")
@@ -376,48 +359,58 @@ deps:
 		--ignore-platform-req=ext-grpc \
 		--ignore-platform-req=php
 
-.PHONY: pre-commit
-pre-commit:
-	$(call log_notice, "Installing project Pre-Commit dependencies")
-	@pre-commit install
+#.PHONY: pre-commit
+#pre-commit:
+#	$(call log_notice, "Installing project Pre-Commit dependencies")
+#	@pre-commit install
 
-.PHONY: logs
-logs:
-	$(call log_notice, "Streaming Docker container logs for $(APP)")
-	@$(docker) logs -f $(shell docker ps -aq -f 'label=application=$(APP)')
+#.PHONY: logs
+#logs:
+#	$(call log_notice, "Streaming Docker container logs for $(APP)")
+#	@$(docker) logs -f $(shell docker ps -aq -f 'label=application=$(APP)')
+
+# ---------------------------
+# Dumps & Backups
+# ---------------------------
+
+.PHONY: dumps
+dumps:
+	$(call log_notice, "Dumping Shopware\'s static build information")
+	php bin/console theme:dump
+	php bin/console feature:dump
+	php bin/console bundle:dump
+
+.PHONY: mysql-backup
+mysql-backup: secrets-dir
+	$(call log_notice, "Creating a backup of Shopware\'s MySQL database")
+	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
 
 # ---------------------------
 # Credentials & Secrets
 # ---------------------------
 
+.PHONY: secrets
+secrets: secrets-dir secrets-gen-ca secrets-gen-server
+
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv
 dotenv:
-ifeq ($(ENV), test)
-ifeq ($(shell test -e .env.test && echo -n yes), yes)
-	$(call log_attention, "Skipping generation of .env.test: file exists!")
-else
-	$(call log_notice, "Generating .env.test for Shopware testing from template")
-	@cp .env.template .env.test
-endif
-else
 ifeq ($(shell test -e .env && echo -n yes), yes)
-	$(call log_attention, "Skipping generation of .env.local: file exists!")
+	$(call log_attention, "Skipping generation of .env: file exists!")
 else
 	$(call log_notice, "Generating .env for Shopware configuration from template")
 	@cp .env.template .env
 	@sed -i -e "s/APP_SECRET=CHANGEME/APP_SECRET=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 80)/g" .env
 	@sed -i -e "s/INSTANCE_ID=CHANGEME/INSTANCE_ID=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
 	@sed -i -e "s/DATABASE_URL=mysql:\/\/shopware:shopware@127.0.0.1:3306\/shopware/DATABASE_URL=mysql:\/\/shopware:shopware@mysql:3306\/shopware/g" .env
-	@sed -i -e "s/APP_URL=http:\/\/localhost:9161/APP_URL=https:\/\/shopware.internal/g" .env
+	@sed -i -e "s/APP_URL=http:\/\/localhost:8000/APP_URL=https:\/\/shopware.internal/g" .env
 	@sed -i -e "s/MAILER_DSN=smtp:\/\/shopware:shopware@127.0.0.1:1025/MAILER_DSN=smtp:\/\/shopware:shopware@mailpit:1025/g" .env
-	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:9161/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env
+	@sed -i -e "s/STOREFRONT_PROXY_URL=http:\/\/localhost:8000/STOREFRONT_PROXY_URL=https:\/\/shopware.internal/g" .env
 	@sed -i -e "s/OPENSEARCH_URL=http:\/\/127.0.0.1:9200/OPENSEARCH_URL=http:\/\/opensearch:9200/g" .env
 	@sed -i -e "s/OTEL_PHP_AUTOLOAD_ENABLED=false/OTEL_PHP_AUTOLOAD_ENABLED=true/g" .env
 	@sed -i -e "s/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127.0.0.1:4317/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/otel-collector:4317/g" .env
-	@sed -i -e "s/S3_ACCESS_KEY=CHANGEME/S3_ACCESS_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
-	@sed -i -e "s/S3_SECRET_KEY=CHANGEME/S3_SECRET_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 64)/g" .env
-endif
+	@sed -i -e "s/SHOPWARE_S3_ACCESS_KEY=CHANGEME/SHOPWARE_S3_ACCESS_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32)/g" .env
+	@sed -i -e "s/SHOPWARE_S3_SECRET_KEY=CHANGEME/SHOPWARE_S3_SECRET_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 64)/g" .env
 endif
 
 
@@ -451,14 +444,13 @@ endif
 # Destinations
 # ---------------------------
 
+.PHONY: dirs
+dirs: secrets-dir output-dir
+
 # Create the secrets directory
 .PHONY: secrets-dir
 secrets-dir:
 	$(call log_notice, "Creating directory for secrets at: $(SECRETS_DIR)")
-ifeq ($(shell test -e $(SECRETS_TLS_DIR)/backup.sql && echo -n yes ), yes)
-	$(call log_attention, "Found Shopware backup.sql in $(SECRETS_DIR)! Backing it up to /tmp/sw-backup.sql")
-	@cp $(SECRETS_DIR) /tmp/sw-backup.sql
-endif
 	@mkdir -p $(SECRETS_DIR)
 	@mkdir -p $(SECRETS_TLS_DIR)
 
@@ -472,24 +464,24 @@ output-dir:
 # Housekeeping
 # ---------------------------
 
-.PHONY: prune-bootstrap
-prune-bootstrap:
-	$(call log_attention, "Removing hostnames from /etc/hosts!")
-	@$(SCRIPT_DIR)/hosts.sh remove
-
-.PHONY: prune-compose
-prune-compose:
-	$(call log_attention, "Stopping Docker Compose project!")
-ifeq ($(CI), y)
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose-base.yaml down -v
-else
-	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose.yaml down -v
-endif
-
-.PHONY: prune-compose-network
-prune-compose-network:
-	$(call log_attention, "Removing public Docker Compose network!")
-	@$(docker) network rm public --force
+#.PHONY: prune-bootstrap
+#prune-bootstrap:
+#	$(call log_attention, "Removing hostnames from /etc/hosts!")
+#	@$(SCRIPT_DIR)/hosts.sh remove
+#
+#.PHONY: prune-compose
+#prune-compose:
+#	$(call log_attention, "Stopping Docker Compose project!")
+#ifeq ($(CI), y)
+#	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose-base.yaml down -v
+#else
+#	@$(docker) compose --env-file $(ENV_FILE) -f docker/cluster/compose.yaml down -v
+#endif
+#
+#.PHONY: prune-compose-network
+#prune-compose-network:
+#	$(call log_attention, "Removing public Docker Compose network!")
+#	@$(docker) network rm public --force
 
 .PHONY: prune-files
 prune-files: prune-secrets prune-output prune-deps prune-var prune-public prune-install prune-theme
@@ -506,25 +498,25 @@ prune-output:
 
 .PHONY: prune-deps
 prune-deps:
-	$(call log_attention, "Removing Shopware dependencies in $(DEPENDENCY_DIR)!")
-	rm -rf $(DEPENDENCY_DIR)
+	$(call log_attention, "Removing Shopware dependencies in $(VENDOR_DIR)!")
+	rm -rf $(VENDOR_DIR)
 
 .PHONY: prune-var
 prune-var:
 	$(call log_attention, "Cleaning up Shopware var directory in $(VAR_DIR)!")
-	rm -rf $(VAR_DIR)/cache/*
-	rm -rf $(VAR_DIR)/log/*
+	rm -rf $(VAR_DIR)/cache
+	rm -rf $(VAR_DIR)/log
 	rm -rf $(VAR_DIR)/*.json
 	rm -rf $(VAR_DIR)/*.scss
 
 .PHONY: prune-public
 prune-public:
 	$(call log_attention, "Cleaning up Shopware public directory in $(PUBLIC_DIR)!")
-	rm -rf $(PUBLIC_DIR)/bundles/*
-	rm -rf $(PUBLIC_DIR)/media/*
-	rm -rf $(PUBLIC_DIR)/theme/*
-	rm -rf $(PUBLIC_DIR)/thumbnail/*
-	rm -rf $(PUBLIC_DIR)/sitemap/*
+	rm -rf $(PUBLIC_DIR)/bundles
+	rm -rf $(PUBLIC_DIR)/media
+	rm -rf $(PUBLIC_DIR)/theme
+	rm -rf $(PUBLIC_DIR)/thumbnail
+	rm -rf $(PUBLIC_DIR)/sitemap
 
 .PHONY: prune-install
 prune-install:
@@ -539,13 +531,13 @@ prune-theme:
 # ---------------------------
 # Checks
 # ---------------------------
-.PHONY: version
-version:
-	@echo -n "$(VERSION)"
-
+#.PHONY: version
+#version:
+#	@echo -n "$(VERSION)"
+#
 .PHONY: name
 name:
-	@echo -n "$(NAME)"
+	@echo -n "$(NAME)@$(VERSION)"
 
 .PHONY: tools-check
 tools-check:

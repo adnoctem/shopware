@@ -71,6 +71,14 @@ function "get_tags" {
   result = VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION])
 }
 
+function "build_tags" {
+  params = []
+  result = flatten(concat(
+    [for tag in get_tags() : "${REPOSITORY}:${tag}"],
+    [for registry in get_registry() : [for tag in get_tags() : "${registry}/${REPOSITORY}:${tag}"]]
+  ))
+}
+
 # determine in which we're going to append for the image
 function "get_registry" {
   params = []
@@ -79,22 +87,67 @@ function "get_registry" {
 
 # create the fully qualified tags
 function "tags" {
-  params = []
-  result = flatten(concat(
-    [for tag in get_tags() : "${REPOSITORY}:${tag}"],
-    [for registry in get_registry() : [for tag in get_tags() : "${registry}/${REPOSITORY}:${tag}"]]
-  ))
+  params = [
+    php,
+    suffix
+  ]
+  result = flatten([
+    for registry in get_registry() :
+    [
+      for tag in get_tags() :
+      concat(
+          tag == "latest" ? suffix == "-fcgi" ? ["${registry}/${REPOSITORY}:${tag}"] : [] : [],
+        ["${registry}/${REPOSITORY}:${tag}-${php}${suffix}"]
+      )
+    ]
+  ])
 }
 
-# ==== Bake Targets ====
+# ==== Bake Groups ====
 group "default" {
   targets = ["shopware"]
 }
 
-# The 'shopware' application image
+group "all" {
+  targets = ["shopware", "shopware-nginx", "shopware-caddy"]
+}
+
+# ==== Bake Targets ====
+# The (base) application image
 target "shopware" {
   name = "shopware-php${replace(php, ".", "-")}"
-  dockerfile = "Dockerfile" # symlink
+  # dockerfile = "Dockerfile"
+  matrix = {
+    php = get_php_version()
+  }
+  args = {
+    PHP_VERSION = php
+  }
+  platforms = [
+    "linux/amd64",
+    "linux/arm64",
+    "linux/arm/v7",
+    "linux/arm/v6",
+    #"linux/riscv64",
+    "linux/s390x",
+    "linux/386",
+    # "linux/ppc64le" gRPC doesn't build on ppc64le
+  ]
+  tags = tags(
+    php,
+    "-fcgi"
+  )
+  labels = labels()
+  output = ["type=docker"]
+}
+
+# The Nginx application image
+target "shopware-nginx" {
+  name       = "shopware-nginx-php${replace(php, ".", "-")}"
+  dockerfile = "docker/nginx.Dockerfile"
+  contexts = {
+    base = "docker-image://fmjstudios/shopware:v${VERSION}"
+  }
   matrix = {
     php = get_php_version()
   }
@@ -109,9 +162,43 @@ target "shopware" {
     "linux/riscv64",
     "linux/s390x",
     "linux/386",
-    "linux/ppc64le"
+    # "linux/ppc64le"
   ]
-  tags = tags()
+  tags = tags(
+    php,
+    "-nginx"
+  )
+  labels = labels()
+  output = ["type=docker"]
+}
+
+# The Caddy application image
+target "shopware-caddy" {
+  name       = "shopware-caddy-php${replace(php, ".", "-")}"
+  dockerfile = "docker/caddy.Dockerfile"
+  contexts = {
+    base = "docker-image://fmjstudios/shopware:v${VERSION}"
+  }
+  matrix = {
+    php = get_php_version()
+  }
+  args = {
+    PHP_VERSION = php
+  }
+  platforms = [
+    "linux/amd64",
+    "linux/arm64",
+    "linux/arm/v7",
+    "linux/arm/v6",
+    "linux/riscv64",
+    "linux/s390x",
+    "linux/386",
+    # "linux/ppc64le"
+  ]
+  tags = tags(
+    php,
+    "-caddy"
+  )
   labels = labels()
   output = ["type=docker"]
 }

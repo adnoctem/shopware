@@ -16,9 +16,11 @@ ctl_usage() {
 	echo
 	echo "Usage: $(basename "${0}") <COMMAND>"
 	echo
+	echo "shell   - Obtain a Shell in the container"
+	echo "sleep   - Sleep forever"
 	echo "init    - Initialize the Shopware instance"
 	echo "start   - Start the supervisord process"
-	echo "run     - Run Shopware (build, initialize & start)"
+	echo "run     - Run Shopware (initialize & start)"
 	echo "help    - Print this usage information"
 	echo
 }
@@ -32,29 +34,29 @@ ctl_usage() {
 ctl_init() {
 	database_connection_check
 	deployment_helper
+  log "Completed pre-deployment checks!"
 }
 
 # ----------------------
 #   'start' function
 # ----------------------
 ctl_start() {
+  log "Starting supervisord..."
 	/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 }
 
 # ----------------------
-#   'deps' function
+#   'shell' function
 # ----------------------
-ctl_deps() {
-  shopware_install_dependencies
+ctl_shell() {
+  /bin/sh
 }
 
 # ----------------------
-#   'build' function
+#   'sleep' function
 # ----------------------
-ctl_build() {
-  database_connection_check
-  shopware_build_storefront
-  shopware_build_administration
+ctl_sleep() {
+  sleep infinity
 }
 
 # --------------------------------
@@ -64,13 +66,12 @@ main() {
 	cmd=${1}
 
 	case "${cmd}" in
-	build)
-	  ctl_deps
-	  ctl_build
+	shell)
+	  ctl_shell
 	  return $?
 	  ;;
-	deps)
-	  ctl_deps
+	sleep)
+	  ctl_sleep
 	  return $?
 	  ;;
 	init)
@@ -88,7 +89,7 @@ main() {
 		;;
 	*)
 		log "Unknown command: ${cmd}. See 'help' command for usage information:"
-		hosts::usage
+		ctl_usage
 		return 1
 		;;
 	esac
