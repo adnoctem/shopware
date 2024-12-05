@@ -100,7 +100,7 @@ APP ?= shopware
 CI ?= n
 
 # Docker image
-PHP_VERSION ?= 8.2
+PHP_VERSION ?= 8.3
 PORT ?= 9161
 
 # ---------------------------
@@ -384,6 +384,16 @@ dumps:
 mysql-backup: secrets-dir
 	$(call log_notice, "Creating a backup of Shopware\'s MySQL database")
 	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
+
+.PHONY: mysql-import
+mysql-import:
+	$(call log_notice, "Importing backup of Shopware\'s MySQL database")
+ifeq ($(shell test -e $(SECRETS_DIR)/backup.sql && echo -n yes), yes)
+	@docker exec mysql mysql -u root --password=shopware shopware < $(SECRETS_DIR)/backup.sql
+else
+	$(call log_error, "Cannot import non-existing database backup! $(SECRETS_DIR)/backup.sql does not exist.")
+	exit 1
+endif
 
 # ---------------------------
 # Credentials & Secrets
