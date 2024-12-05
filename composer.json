@@ -68,9 +68,8 @@
     "tests": [
       "phpunit"
     ],
-    "deployment": [
-      "shopware-deployment-helper",
-      "run"
+    "deployment-helper": [
+      "shopware-deployment-helper run"
     ],
     "auto-scripts": {
       "assets:install": "symfony-cmd"

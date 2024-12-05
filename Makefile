@@ -100,7 +100,7 @@ APP ?= shopware
 CI ?= n
 
 # Docker image
-PHP_VERSION ?= 8.2
+PHP_VERSION ?= 8.3
 PORT ?= 9161
 
 # ---------------------------
@@ -327,6 +327,7 @@ endef
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
 	@$(docker) compose up -d
+	@$(composer) run deployment-helper
 	@symfony server:start -d --no-tls --allow-http
 	@symfony server:log
 
