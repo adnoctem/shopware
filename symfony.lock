@@ -23,6 +23,15 @@
             "config/packages/nyholm_psr7.yaml"
         ]
     },
+    "pentatrion/vite-bundle": {
+        "version": "7.1",
+        "recipe": {
+            "repo": "github.com/shopware/recipes",
+            "branch": "main",
+            "version": "6.5",
+            "ref": "8cc0e41387cb37cb65cc9a1ce8bac7eed899687a"
+        }
+    },
     "php-http/discovery": {
         "version": "1.19",
         "recipe": {
