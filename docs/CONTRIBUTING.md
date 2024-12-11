@@ -47,7 +47,7 @@ in [`scripts/hosts.sh`](../scripts/hosts.sh) in your `/etc/hosts/` to be-able to
 If your current user has root-privileges then the script will just insert the hostnames, otherwise you will be prompt
 for the `sudo` password.
 
-...__TBA__
+...**TBA**
 
 When you're done and want to delete the _Compose_ project as well as the hostnames inserted in your `/etc/hosts` you
 might run the `prune` target which will revert these changes for you.
@@ -58,12 +58,12 @@ make prune
 
 ## ℹ️ Commit Message Format
 
-This specification is inspired by and supersedes the __AngularJS commit message format__.
+This specification is inspired by and supersedes the **Angular commit message format**.
 
 We have very precise rules over how our Git commit messages must be formatted.
-This format leads to __easier to read commit history__.
+This format leads to **easier to read commit history**.
 
-Each commit message consists of a __header__, a __body__, and a __footer__.
+Each commit message consists of a **header**, a **body**, and a **footer**.
 
 ```text
 <header>
@@ -100,38 +100,38 @@ The `<type>` and `<summary>` fields are mandatory, the `(<scope>)` field is opti
 
 Must be one of the following:
 
-* __feat__: New features
-* __fix__: bugfixes
-* __docs__: Documentation changes
-* __refactor__: Code changes which neither add features nor fix bugs
-* __test__: Adding tests or improving upon existing tests
-* __chore__: Miscellaneous maintenance tasks which can generally be ignored
-* __build__: Changes or improvements to the build tool or to the projects dependencies (_supported Scopes_: `make`)
-* __ci__: Changes to CI configuration files and scripts (_supported Scopes_: `actions`)
+- **feat**: New features
+- **fix**: bugfixes
+- **docs**: Documentation changes
+- **refactor**: Code changes which neither add features nor fix bugs
+- **test**: Adding tests or improving upon existing tests
+- **chore**: Miscellaneous maintenance tasks which can generally be ignored
+- **build**: Changes or improvements to the build tool or to the projects dependencies (_supported Scopes_: `make`)
+- **ci**: Changes to CI configuration files and scripts (_supported Scopes_: `actions`)
 
 #### Scopes
 
 The following is the list of supported scopes:
 
-* `plugins` - Changes affecting a multitude of plugins at once
-* `plugin/*` - Changes affecting single plugins
-* `docker` - Changes to Docker build files
-* `compose` - Changes to Docker Compose manifests
-* `composer` - Changes made to Composer's files
-* `make` - Changes affecting the Make-based build tool
-* `scripts` - Changes to scripts
-* `config` - Changes to configuration files
-* `env` - Changes to environment configuration
-* `workflows` - Changes affecting a multitude of CI workflows at once
-* `workflow/*` - Changes affecting single workflows
+- `plugins` - Changes affecting a multitude of plugins at once
+- `plugin/*` - Changes affecting single plugins
+- `docker` - Changes to Docker build files
+- `compose` - Changes to Docker Compose manifests
+- `composer` - Changes made to Composer's files
+- `make` - Changes affecting the Make-based build tool
+- `scripts` - Changes to scripts
+- `config` - Changes to configuration files
+- `env` - Changes to environment configuration
+- `workflows` - Changes affecting a multitude of CI workflows at once
+- `workflow/*` - Changes affecting single workflows
 
 #### Summary
 
 Use the summary field to provide a succinct description of the change:
 
-* use the imperative, present tense: "change" not "changed" nor "changes"
-* don't capitalize the first letter
-* no dot (.) at the end
+- use the imperative, present tense: "change" not "changed" nor "changes"
+- don't capitalize the first letter
+- no dot (.) at the end
 
 #### <a name="commit-body"></a>Commit Message Body
 
@@ -168,11 +168,11 @@ DEPRECATED: <what is deprecated>
 Closes #<pr number>
 ```
 
-Breaking Change section should start with the phrase "BREAKING CHANGE: " followed by a summary of the breaking change, a
-blank line, and a detailed description of the breaking change that also includes migration instructions.
+Breaking Change section should start with the phrase "BREAKING CHANGE: " followed by a summary of the breaking change,
+an empty line, and a detailed description of the breaking change that also includes migration instructions.
 
 Similarly, a Deprecation section should start with "DEPRECATED: " followed by a short description of what is deprecated,
-a blank line, and a detailed description of the deprecation that also mentions the recommended update path.
+an empty line, and a detailed description of the deprecation that also mentions the recommended update path.
 
 #### Revert commits
 
@@ -180,8 +180,8 @@ If the commit reverts a previous commit, it should begin with `revert:`, followe
 
 The content of the commit message body should contain:
 
-* information about the SHA of the commit being reverted in the following format: `This reverts commit <SHA>`,
-* a clear description of the reason for reverting the commit message.
+- information about the SHA of the commit being reverted in the following format: `This reverts commit <SHA>`,
+- a clear description of the reason for reverting the commit message.
 
 ## ✅ How to Contribute
 
@@ -194,10 +194,10 @@ PRs.
 
 ### Technical Requirements
 
-* Must
+- Must
   follow [Shopware Plugin Guides](https://developer.shopware.com/docs/guides/plugins/plugins/plugin-base-guide.html)
-* Must pass CI jobs for linting and testing
-* Any change to the application requires a version bump following [SemVer](https://semver.org/) principles.
+- Must pass CI jobs for linting and testing
+- Any change to the application requires a version bump following [SemVer](https://semver.org/) principles.
   See [Immutability](#immutability) and [Versioning](#versioning) below
 
 Once changes have been merged, the release job will automatically run to package and release changed charts.
@@ -216,6 +216,10 @@ setups for some time without issues. This is obviously hard to do, but we'll tak
 
 Any breaking (backwards incompatible) changes to a chart should:
 
+<!-- textlint-disable terminology -->
+
 1. Bump the MAJOR version
-2. In the README, under a section called "Upgrading", describe the manual steps necessary to upgrade to the new (
+2. In the _readme_, under a section called "Upgrading", describe the manual steps necessary to upgrade to the new (
    specified) MAJOR version
+
+<!-- textlint-enable -->

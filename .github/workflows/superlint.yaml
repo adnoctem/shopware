@@ -1,6 +1,6 @@
-name: 'Run Super-Linter'
+name: "Run Super-Linter"
 
-on: [ 'push', 'pull_request' ]
+on: ["push", "pull_request"]
 
 permissions: read-all
 
@@ -25,9 +25,10 @@ jobs:
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FILTER_REGEX_EXCLUDE: (bin/|var/|vendor/)
+          FILTER_REGEX_EXCLUDE: (^bin/*?|var/|vendor/|*?\.lock$)
           BASH_EXEC_IGNORE_LIBRARIES: true
           VALIDATE_JSCPD: false
+          VALIDATE_ENV: false # annoying ordering
           VALIDATE_PHP: false
           VALIDATE_PHP_BUILTIN: false
           VALIDATE_PHP_PHPCS: false

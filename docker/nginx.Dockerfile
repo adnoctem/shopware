@@ -2,7 +2,7 @@
 
 ARG VERSION=0.1.0
 ARG PORT=8000
-ARG USER=shopware
+ARG USER="shopware"
 
 # lock versions
 FROM fmjstudios/shopware:v${VERSION} as base

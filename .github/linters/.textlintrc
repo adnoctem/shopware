@@ -1,0 +1,12 @@
+// ref: https://github.com/sapegin/textlint-rule-terminology
+{
+  "rules": {
+    "terminology": {
+      "exclude": [
+        "README",
+        "AngularJS",
+        "README",
+      ]
+    }
+  }
+}

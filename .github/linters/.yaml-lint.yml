@@ -1,0 +1,20 @@
+extends: default
+
+rules:
+  # 120 chars should be enough, but don't fail if a line is longer
+  line-length:
+    max: 120
+    level: warning
+
+  # ignore spaces within brackets (for now)
+  brackets:
+    level: warning
+
+  # ignore spaces within braces (for now)
+  braces:
+    level: warning
+
+  # don't bother me with these rules
+  comments: disable
+  comments-indentation: disable
+  document-start: disable

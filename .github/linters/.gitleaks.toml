@@ -10,5 +10,6 @@ useDefault = true
 description = "global ignore"
 paths = [
     '''\w*?public/bundles/administration/static*''',
-    '''.env'''
+    '''.env''',
+    '''\w*?deploy/docker/resources/grafana.ini'''
 ]

@@ -20,8 +20,8 @@ exporters:
 service:
   pipelines:
     traces:
-      receivers: [ otlp ]
-      exporters: [ otlp ]
+      receivers: [otlp]
+      exporters: [otlp]
 #    metrics:
 #      receivers: [ otlp ]
 #      processors: [ batch ]

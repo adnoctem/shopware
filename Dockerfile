@@ -55,9 +55,9 @@ RUN apk update && apk add --no-cache \
     trurl \
     acl
 
-RUN wget -O /usr/local/bin/php-fpm-healthcheck \
-    https://raw.githubusercontent.com/renatomefi/php-fpm-healthcheck/master/php-fpm-healthcheck \
-    && chmod +x /usr/local/bin/php-fpm-healthcheck
+RUN curl -L https://raw.githubusercontent.com/renatomefi/php-fpm-healthcheck/master/php-fpm-healthcheck \
+    -o /usr/local/bin/php-fpm-healthcheck && \
+    chmod +x /usr/local/bin/php-fpm-healthcheck
 
 # install Node.js and the Node package manager
 #COPY --from=node /usr/local/bin/node /usr/local/bin/
@@ -164,7 +164,9 @@ chown -R ${USER}:${USER} /var/www/html/files /var/www/html/public/theme /var/www
 EOF
 
 # install shopware-cli
-RUN apk add --no-cache bash && \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN set -o pipefail && \
+    apk add --no-cache bash && \
     curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
     apk add --no-cache shopware-cli
 
