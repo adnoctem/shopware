@@ -4,6 +4,7 @@
   "license": "MIT",
   "type": "project",
   "require": {
+    "php": ">=8.2 <8.4",
     "ext-grpc": "*",
     "ext-opentelemetry": "*",
     "composer-runtime-api": "^2.0",
@@ -17,6 +18,8 @@
     "shopware/elasticsearch": "^6.6",
     "shopware/opentelemetry": "^0.1.5",
     "shopware/storefront": "^6.6",
+    "swag/language-pack": "^4.17",
+    "swag/paypal": "^9.6",
     "symfony/flex": "^2.4"
   },
   "repositories": [
@@ -48,7 +51,8 @@
     "allow-plugins": {
       "symfony/flex": true,
       "symfony/runtime": true,
-      "php-http/discovery": true
+      "php-http/discovery": true,
+      "tbachert/spi": true
     },
     "optimize-autoloader": true,
     "sort-packages": true
@@ -63,6 +67,9 @@
     ],
     "tests": [
       "phpunit"
+    ],
+    "deployment-helper": [
+      "shopware-deployment-helper run"
     ],
     "auto-scripts": {
       "assets:install": "symfony-cmd"

@@ -1,9 +1,19 @@
 #syntax=docker/dockerfile:1.4
 
+ARG VERSION=0.1.0
+ARG PORT=8000
+ARG USER="shopware"
+
+# lock versions
+FROM fmjstudios/shopware:v${VERSION} as base
 FROM base as system
 
-ARG USER=shopware
-ARG PORT=8000
+# (re)set args
+ARG USER
+ARG PORT
+
+# switch to root to modify the image
+USER root
 
 # install base dependencies
 RUN apk add --no-cache \
@@ -23,10 +33,14 @@ chmod -R 755 /run/php
 chown -R ${USER}:${USER} /var/log/nginx /var/lib/nginx
 EOF
 
-ENV PHP_FPM_LISTEN="/run/php/php-fpm.sock"
+# override FPM TCP listener to use a local socket
+ENV PORT=${PORT:-8000} \
+    PHP_FPM_LISTEN="/run/php/php-fpm.sock"
 
-# switch to unprivileged user
-USER ${USER}
+# add a healthcheck
+# ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
+HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
+   CMD curl --fail "http://localhost:${PORT:-8000}/api/_info/health-check" || exit 1
 
 # execute 'swctl' by default
 ENTRYPOINT ["swctl"]
@@ -36,6 +50,11 @@ ENTRYPOINT ["swctl"]
 # -------------------------------------
 FROM system as prod
 
-CMD ["run"]
+# (re)set args
+ARG PORT
+ARG USER
 
+# switch to unprivileged user
+USER ${USER}
+CMD ["run"]
 EXPOSE ${PORT}

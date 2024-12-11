@@ -3,7 +3,6 @@ shopware:
   profiler:
     integrations:
       - OpenTelemetry
-
 #monolog:
 #    handlers:
 #        main:

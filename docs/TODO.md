@@ -3,15 +3,15 @@
 ## ➕ Additions
 
 - [ ] Add [Shopware Analytics](https://store.shopware.com/en/swag541977532977f/shopware-analytics.html) (possibly via
-  Composer) -> not possible in 'dev' mode (requires registered shop)
+      Composer) -> not possible in 'dev' mode (requires registered shop)
 
 ## ✏️ Planned Changes
 
-- [X] ~~Use [GitHub's workflow service containers][github_service_containers] instead of a new
-  [Docker Compose file][ci_compose]~~ -> made obsolete by new discoveries/configurations
-- [X] Make Docker image rootless
-- [X] Integrate `Shopware Deployment Helper` into `swctl` Docker container executable -> completed before I even promote
-  it to a task
+- [x] ~~Use [GitHub's workflow service containers][github_service_containers] instead of a new
+      [Docker Compose file][ci_compose]~~ -> made obsolete by new discoveries/configurations
+- [x] Make Docker image rootless
+- [x] Integrate `Shopware Deployment Helper` into `swctl` Docker container executable -> completed before I even promote
+      it to a task
 - [ ] Write a `snippet-translator` Plugin
 
 ## 💡 Ideas

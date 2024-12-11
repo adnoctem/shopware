@@ -3,7 +3,7 @@
 
 name: "\U0001F680 Feature request"
 description: Suggest an idea for this project
-labels: [ "feature-request" ]
+labels: ["feature-request"]
 body:
   - type: markdown
     attributes:

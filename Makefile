@@ -42,36 +42,23 @@ export
 # ---------------------------
 # Constants
 # ---------------------------
-
-#SCRIPT_DIR := $(ROOT_DIR)/scripts
 CONFIG_DIR := $(ROOT_DIR)/config
 CONFIG_TLS_DIR := $(CONFIG_DIR)/ssl
-#DOCS_DIR := $(ROOT_DIR)/docs
 OUTPUT_DIR := $(ROOT_DIR)/dist
 SECRETS_DIR := $(ROOT_DIR)/secrets
 SECRETS_TLS_DIR := $(SECRETS_DIR)/ssl
 VENDOR_DIR := $(ROOT_DIR)/vendor
 VAR_DIR := $(ROOT_DIR)/var
 PUBLIC_DIR := $(ROOT_DIR)/public
-#DOCKER_DIR := $(ROOT_DIR)/docker
 CI_DIR := $(ROOT_DIR)/.github
 CI_LINTER_DIR := $(CI_DIR)/linters
-#PLUGIN_DIR := $(ROOT_DIR)/custom/plugins
-#APPS_DIR := $(ROOT_DIR)/custom/apps
 
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
-#DOCKERFILE := $(ROOT_DIR)/Dockerfile
-#ENV_FILE := $(ROOT_DIR)/.env
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
 TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./secrets' --exclude='./.github' --exclude='./dist' --exclude-from'=./.gitignore'
-#PLUGINS := $(shell find $(PLUGIN_DIR) $(FIND_FLAGS))
-#APPS := $(shell find $(APPS_DIR) $(FIND_FLAGS))
-
-#COMPOSE_SUBNET := 172.25.0.0/16
-#COMPOSE_GATEWAY_IP := 172.25.0.1
 
 # general variables
 #DATE := $(shell date '+%d.%m.%y-%T')
@@ -100,7 +87,7 @@ APP ?= shopware
 CI ?= n
 
 # Docker image
-PHP_VERSION ?= 8.2
+PHP_VERSION ?= 8.3
 PORT ?= 9161
 
 # ---------------------------
@@ -327,6 +314,7 @@ endef
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
 	@$(docker) compose up -d
+	@$(composer) run deployment-helper
 	@symfony server:start -d --no-tls --allow-http
 	@symfony server:log
 
@@ -568,4 +556,4 @@ shellcheck:
 
 .PHONY: shfmt
 shfmt:
-	@shfmt -d .
+	@shfmt -d $(shell shfmt -f . | grep -E "^bin/|^docker/|^scripts/")

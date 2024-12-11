@@ -1,6 +1,10 @@
 #syntax=docker/dockerfile:1.4
 
-ARG PHP_VERSION=8.2
+ARG PHP_VERSION=8.3
+#ARG NODE_VERSION=22
+
+# lock versions
+#FROM node:${NODE_VERSION}-alpine as node
 FROM php:$PHP_VERSION-fpm-alpine as base
 
 # container settings
@@ -40,17 +44,29 @@ RUN curl -sSLf \
         grpc
 
 # install base dependencies
-RUN apk add --no-cache \
+RUN apk update && apk add --no-cache \
     bash=~5.2 \
-    nginx=~1.26 \
     supervisor=~4.2 \
     jq=~1.7 \
+    busybox \
+    fcgi \
+    nodejs \
+    npm \
     trurl \
-    envsubst \
     acl
 
+RUN curl -L https://raw.githubusercontent.com/renatomefi/php-fpm-healthcheck/master/php-fpm-healthcheck \
+    -o /usr/local/bin/php-fpm-healthcheck && \
+    chmod +x /usr/local/bin/php-fpm-healthcheck
+
+# install Node.js and the Node package manager
+#COPY --from=node /usr/local/bin/node /usr/local/bin/
+#COPY --from=node /usr/local/bin/npm /usr/local/bin/
+#COPY --from=node /usr/local/bin/npx /usr/local/bin/
+#COPY --from=node /usr/local/lib /usr/local/
+
 # define core environment variables (php-cli, php-fpm, utils.sh)
-ENV PORT=${PORT} \
+ENV PORT="${PORT}" \
     DATABASE_TIMEOUT=120 \
     PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
     PHP_DISPLAY_ERRORS="Off" \
@@ -132,9 +148,11 @@ COPY --chmod=755 docker/bin/swctl /usr/local/bin
 COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
 
 # add a healthcheck
-# ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/cluster-setup.html#health-check
+# ref: https://github.com/renatomefi/php-fpm-healthcheck
+ENV FCGI_STATUS_PATH=$PHP_FPM_STATUS_PATH \
+    FCGI_CONNECT="localhost:${PORT}"
 HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
-   CMD curl --fail "http://localhost:${PORT:-9161}/api/_info/health-check" || exit 1
+   CMD php-fpm-healthcheck || exit 1
 
 # prepare image for volumes - has to be done before we copy sources
 VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
@@ -146,7 +164,9 @@ chown -R ${USER}:${USER} /var/www/html/files /var/www/html/public/theme /var/www
 EOF
 
 # install shopware-cli
-RUN apk add --no-cache bash && \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN set -o pipefail && \
+    apk add --no-cache bash && \
     curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
     apk add --no-cache shopware-cli
 
@@ -198,7 +218,6 @@ ENV APP_ENV=dev \
     INSTALL_ADMIN_USERNAME=admin \
     INSTALL_ADMIN_PASSWORD=shopware
 
-
 # switch to unprivileged user
 USER ${USER}
 
@@ -222,9 +241,9 @@ RUN rm -rf ./docker # remove non-ignorable docker dir
 
 ENV APP_ENV=dev
 
-RUN --mount=type=secret,id=composer_auth,dst=./auth.json \
-    --mount=type=cache,target=/home/${USER}/.composer \
-    --mount=type=cache,target=/home/${USER}/.npm \
+RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.composer \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.npm \
     shopware-cli project ci --with-dev-dependencies .
 
 # switch to unprivileged user
@@ -249,13 +268,13 @@ COPY --link --chown=${PUID}:${PGID} . ./
 # overwrite defaults
 ENV APP_ENV=prod \
     SHOPWARE_HTTP_CACHE_ENABLED=1 \
-    APP_URL_CHECK_DISABLED=0
+    APP_URL_CHECK_DISABLED=1
 
 # production build
 RUN \
-    --mount=type=secret,id=composer_auth,dst=./auth.json \
-    --mount=type=cache,target=/home/${USER}/.composer \
-    --mount=type=cache,target=/home/${USER}/.npm \
+    --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.composer \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.npm \
     shopware-cli project ci .
 
 # (re)-own files

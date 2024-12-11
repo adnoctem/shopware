@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-# shellcheck shell=sh
+# shellcheck shell=bash
 
 # Environment variables
 export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
@@ -15,7 +14,6 @@ CWD="$(pwd)"
 ROOT="${CWD}"
 SW_TOOL="${ROOT}/bin/console" # use console by default
 ENV_FILE="${ROOT}/.env"
-
 
 # deployment-helper - lock in our defaults
 export INSTALL_LOCALE="${INSTALL_LOCALE:-"en-GB"}"
@@ -49,7 +47,7 @@ log() {
 #   The console the outputs.
 #######################################
 pc() {
-  ensure_project_root
+	ensure_project_root
 
 	# ensure is executable
 	if [ ! -x "${SW_TOOL}" ]; then
@@ -77,7 +75,7 @@ ensure_project_root() {
 	# check if current dir
 	if [ ! -e "${ROOT}/composer.json" ]; then
 		log "ERROR: script is not being executed from project root!"
-	  return 1
+		return 1
 	fi
 
 	return 0
@@ -136,9 +134,9 @@ deployment_helper() {
 
 	ensure_project_root
 	if ! vendor/bin/shopware-deployment-helper run; then
-	  log "ERROR: Could not run Shopware Deployment-Helper! Exited with status $?"
+		log "ERROR: Could not run Shopware Deployment-Helper! Exited with status $?"
 	else
-	  log "Shopware Deployment-Helper executed successfully!"
+		log "Shopware Deployment-Helper executed successfully!"
 	fi
 }
 
@@ -153,7 +151,7 @@ deployment_helper() {
 #   None.
 #######################################
 load_dotenv() {
-  log "DEPRECATED: using deprecated Bash utility function 'load_dotenv' - Shopware's Deployment Helper supports .env files!"
+	log "DEPRECATED: using deprecated Bash utility function 'load_dotenv' - Shopware's Deployment Helper supports .env files!"
 
 	LOAD_DOTENV=${LOAD_DOTENV:-"1"}
 
@@ -203,7 +201,7 @@ load_dotenv() {
 #   Shopware CLI outputs.
 #######################################
 shopware_clear_cache() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_clear_cache' please use 'deployment_helper' to run such tasks!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_clear_cache' please use 'deployment_helper' to run such tasks!"
 
 	log "INFO: Clearing Shopware HTTP cache for environment \"$APP_ENV\""
 	pc cache:clear --env="${APP_ENV}" -n
@@ -220,7 +218,7 @@ shopware_clear_cache() {
 #   Shopware CLI outputs.
 #######################################
 shopware_install_extensions() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_install_extensions' please use 'deployment_helper' to install Shopware extensions!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_install_extensions' please use 'deployment_helper' to install Shopware extensions!"
 
 	list_with_updates=$(php bin/console plugin:list --json | jq 'map(select(.installedAt == null)) | .[].name' -r)
 
@@ -241,7 +239,7 @@ shopware_install_extensions() {
 #   Shopware CLI outputs.
 #######################################
 shopware_update_extensions() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_update_extensions' please use 'deployment_helper' to update Shopware extensions!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_update_extensions' please use 'deployment_helper' to update Shopware extensions!"
 
 	list_with_updates=$(php bin/console plugin:list --json | jq 'map(select(.upgradeVersion != null)) | .[].name' -r)
 
@@ -265,7 +263,7 @@ shopware_update_extensions() {
 #   Shopware CLI outputs.
 #######################################
 shopware_install() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_install' please use 'deployment_helper' to install Shopware!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_install' please use 'deployment_helper' to install Shopware!"
 
 	completed_at=$(date '+%Y-%m-%dT%H:%M:%S+00:00')
 	storefront_name=Storefront
@@ -290,7 +288,7 @@ shopware_install() {
 #   Shopware CLI outputs.
 #######################################
 shopware_setup() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_setup' please use 'deployment_helper' to setup Shopware!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_setup' please use 'deployment_helper' to setup Shopware!"
 
 	log "INFO: Setting up Shopware 6 shop..."
 
@@ -317,26 +315,25 @@ shopware_setup() {
 #   Shopware build logs.
 #######################################
 shopware_install_dependencies() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to install Shopware dependencies!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to install Shopware dependencies!"
 
 	ensure_project_root
 
-  args="--prefer-dist --no-interaction"
-  if [ "${APP_ENV:-"dev"}" = "prod" ]; then args="${args} --no-dev"; fi
+	args="--prefer-dist --no-interaction"
+	if [ "${APP_ENV:-"dev"}" = "prod" ]; then args="${args} --no-dev"; fi
 
 	if [ "$(command -v composer)" ]; then
-    # shellcheck disable=SC2086
-    # required here since composer will not accept multiple options quoted
-    if ! composer install ${args};
-    then
-      log "ERROR: Could not install Shopware dependencies!"
-      return 1
-    fi
+		# shellcheck disable=SC2086
+		# required here since composer will not accept multiple options quoted
+		if ! composer install ${args}; then
+			log "ERROR: Could not install Shopware dependencies!"
+			return 1
+		fi
 
-    log "Installed Shopware dependencies!"
-    return 0
+		log "Installed Shopware dependencies!"
+		return 0
 	else
-	  log "ERROR: Cannot install Shopware dependencies. Composer is not installed!"
+		log "ERROR: Cannot install Shopware dependencies. Composer is not installed!"
 	fi
 }
 
@@ -357,7 +354,7 @@ shopware_install_dependencies() {
 #   Shopware build logs.
 #######################################
 shopware_build_storefront() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to build Shopware!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_build_storefront' please use 'shopware-cli project ci' to build Shopware!"
 
 	ensure_project_root
 	# old PWD
@@ -383,12 +380,12 @@ shopware_build_storefront() {
 			name=$(echo "$config" | jq -r '.technicalName')
 
 			# skip if required
-      skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
-      if [[ ${!skippingEnvVarName:-""} ]]; then
-          continue
-      fi
+			skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
+			if [[ ${!skippingEnvVarName:-""} ]]; then
+				continue
+			fi
 
-			if [[ -f "$parent_path/package.json"  &&   ! -d "$parent_path/node_modules"  && "$name" != "storefront" ]]; then
+			if [[ -f "$parent_path/package.json" && ! -d "$parent_path/node_modules" && "$name" != "storefront" ]]; then
 				log "-> Installing npm dependencies for ${name}"
 				npm i --prefix "${parent_path}" --prefer-offline
 			fi
@@ -428,7 +425,7 @@ shopware_build_storefront() {
 #######################################
 
 shopware_build_administration() {
-  log "DEPRECATED: using deprecated Bash utility function 'shopware_build_administration' please use 'shopware-cli project ci' to build Shopware!"
+	log "DEPRECATED: using deprecated Bash utility function 'shopware_build_administration' please use 'shopware-cli project ci' to build Shopware!"
 
 	ensure_project_root
 	# old PWD
@@ -461,12 +458,12 @@ shopware_build_administration() {
 			name=$(echo "$config" | jq -r '.technicalName')
 
 			# skip if env indicates to do so
-      skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
-      if [[ ${!skippingEnvVarName:-""} ]]; then
-          continue
-      fi
+			skippingEnvVarName="SKIP_$(echo "$name" | sed -e 's/\([a-z]\)/\U\1/g' -e 's/-/_/g')"
+			if [[ ${!skippingEnvVarName:-""} ]]; then
+				continue
+			fi
 
-			if [[ -f "$parent_path/package.json"  &&   ! -d "$parent_path/node_modules"  && "$name" != "administration" ]]; then
+			if [[ -f "$parent_path/package.json" && ! -d "$parent_path/node_modules" && "$name" != "administration" ]]; then
 				log "-> Installing npm dependencies for ${name}"
 				npm i --prefix "${parent_path}" --prefer-offline
 			fi

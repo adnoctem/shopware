@@ -48,20 +48,20 @@ shopware:
       # API/Administration logins
       oauth:
         enabled: true
-        policy: 'time_backoff'
-        reset: '24 hours'
+        policy: "time_backoff"
+        reset: "24 hours"
         limits:
           - limit: 5
-            interval: '10 seconds'
+            interval: "10 seconds"
           - limit: 10
-            interval: '60 seconds'
+            interval: "60 seconds"
       # Administration user password recovery
       user_recovery:
         enabled: true
-        policy: 'time_backoff'
-        reset: '24 hours'
+        policy: "time_backoff"
+        reset: "24 hours"
         limits:
           - limit: 3
-            interval: '10 seconds'
+            interval: "10 seconds"
           - limit: 5
-            interval: '60 seconds'
+            interval: "60 seconds"

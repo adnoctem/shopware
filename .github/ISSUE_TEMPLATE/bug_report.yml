@@ -3,7 +3,7 @@
 
 name: 🐞 Bug
 description: Create a report to help us improve
-labels: [ "tech-issues" ]
+labels: ["tech-issues"]
 body:
   - type: markdown
     attributes:

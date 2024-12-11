@@ -20,16 +20,32 @@ variable "REGISTRIES" {
 }
 
 # lock the image repository
-variable "REPOSITORY" {
+variable "REPO" {
   default = "fmjstudios/shopware"
 }
 
-# build for multiple PHP versions - can be a comma-separated list of values like 7.4,8.1,8.2 etc.
+# build for multiple versions - can be a comma-separated list of values like 7.4,8.1,8.2 etc.
+variable "DEFAULT_PHP" {
+  default = "8.3"
+}
+
 variable "PHP_VERSIONS" {
-  default = "8.2,8.3"
+  default = "8.2,${DEFAULT_PHP}"
 }
 
 # ==== Custom Functions ====
+# determine in which we're going to append for the image
+function "get_registry" {
+  params = []
+  result = flatten(split(",", REGISTRIES))
+}
+
+# determine in which we're going to append for the image
+function "get_target" {
+  params = []
+  result = flatten(split(",", TARGETS))
+}
+
 # OpenContainers labels
 # ref: https://github.com/opencontainers/image-spec/blob/main/annotations.md
 function "labels" {
@@ -49,12 +65,6 @@ function "labels" {
   }
 }
 
-# determine in which Docker repositories we're going to store this image
-# function "get_repository" {
-#   params = []
-#   result = flatten(split(",", REPOSITORIES))
-# }
-
 function "get_target" {
   params = []
   result = flatten(split(",", TARGETS))
@@ -65,40 +75,31 @@ function "get_php_version" {
   result = flatten(split(",", PHP_VERSIONS))
 }
 
-# determine in which we're going to append for the image
-function "get_tags" {
-  params = []
-  result = VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION])
-}
-
-function "build_tags" {
-  params = []
-  result = flatten(concat(
-    [for tag in get_tags() : "${REPOSITORY}:${tag}"],
-    [for registry in get_registry() : [for tag in get_tags() : "${registry}/${REPOSITORY}:${tag}"]]
-  ))
-}
-
-# determine in which we're going to append for the image
-function "get_registry" {
-  params = []
-  result = flatten(split(",", REGISTRIES))
-}
-
-# create the fully qualified tags
 function "tags" {
   params = [
-    php,
-    suffix
+    suffix,
+    target
   ]
   result = flatten([
-    for registry in get_registry() :
     [
-      for tag in get_tags() :
-      concat(
-          tag == "latest" ? suffix == "-fcgi" ? ["${registry}/${REPOSITORY}:${tag}"] : [] : [],
-        ["${registry}/${REPOSITORY}:${tag}-${php}${suffix}"]
-      )
+      for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
+      flatten([
+          tag == "latest" ? "${REPO}:${tag}" : "",
+          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${REPO}:${tag}${suffix}" : "",
+          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${REPO}:${tag}" : "",
+      ])
+    ],
+    [
+      for rgs in get_registry() : [
+      for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
+      flatten([
+          tag == "latest" ? "${rgs}/${REPO}:${tag}" : "",
+          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}${suffix}" : "",
+          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
+      ])
+    ]
     ]
   ])
 }
@@ -108,34 +109,45 @@ group "default" {
   targets = ["shopware"]
 }
 
+group "nginx" {
+  targets = ["shopware-nginx"]
+}
+
+# group "caddy" {
+#   targets = ["shopware-caddy"]
+# }
+
 group "all" {
-  targets = ["shopware", "shopware-nginx", "shopware-caddy"]
+  targets = ["shopware", "shopware-nginx"]
 }
 
 # ==== Bake Targets ====
 # The (base) application image
 target "shopware" {
-  name = "shopware-php${replace(php, ".", "-")}"
-  # dockerfile = "Dockerfile"
+  name       = "shopware-php${replace(php, ".", "-")}-${tgt}"
+  dockerfile = "Dockerfile"
   matrix = {
     php = get_php_version()
+    tgt = get_target()
   }
   args = {
     PHP_VERSION = php
   }
   platforms = [
     "linux/amd64",
-    "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    #"linux/riscv64",
-    "linux/s390x",
-    "linux/386",
-    # "linux/ppc64le" gRPC doesn't build on ppc64le
+    # uncomment if required
+    # "linux/arm64",
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
+    # "linux/ppc64le"
   ]
+  target = tgt
   tags = tags(
-    php,
-    "-fcgi"
+    "-fcgi",
+    tgt
   )
   labels = labels()
   output = ["type=docker"]
@@ -143,62 +155,70 @@ target "shopware" {
 
 # The Nginx application image
 target "shopware-nginx" {
-  name       = "shopware-nginx-php${replace(php, ".", "-")}"
+  name       = "shopware-nginx-php${replace(php, ".", "-")}-${tgt}"
   dockerfile = "docker/nginx.Dockerfile"
   contexts = {
-    base = "docker-image://fmjstudios/shopware:v${VERSION}"
+    base = "docker-image://fmjstudios/shopware:latest"
   }
   matrix = {
     php = get_php_version()
+    tgt = get_target()
   }
   args = {
     PHP_VERSION = php
   }
   platforms = [
     "linux/amd64",
-    "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    "linux/riscv64",
-    "linux/s390x",
-    "linux/386",
+    # uncomment if required
+    # "linux/arm64",
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
     # "linux/ppc64le"
   ]
   tags = tags(
-    php,
-    "-nginx"
+    "-nginx",
+    tgt
   )
   labels = labels()
   output = ["type=docker"]
 }
 
+# NOTE: The image using Caddy as the web server is deprecated, due to the DoS possibility with Caddy's
+# 'Transfer-Encoding' HTTP header. Until further notice we'll only provide an Nginx image.
+# ref: https://github.com/shopware/docker/issues/107
+#
 # The Caddy application image
-target "shopware-caddy" {
-  name       = "shopware-caddy-php${replace(php, ".", "-")}"
-  dockerfile = "docker/caddy.Dockerfile"
-  contexts = {
-    base = "docker-image://fmjstudios/shopware:v${VERSION}"
-  }
-  matrix = {
-    php = get_php_version()
-  }
-  args = {
-    PHP_VERSION = php
-  }
-  platforms = [
-    "linux/amd64",
-    "linux/arm64",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    "linux/riscv64",
-    "linux/s390x",
-    "linux/386",
-    # "linux/ppc64le"
-  ]
-  tags = tags(
-    php,
-    "-caddy"
-  )
-  labels = labels()
-  output = ["type=docker"]
-}
+# target "shopware-caddy" {
+#   name       = "shopware-caddy-php${replace(php, ".", "-")}"
+#   dockerfile = "docker/caddy.Dockerfile"
+#   contexts = {
+#     base = "docker-image://fmjstudios/shopware:latest"
+#   }
+#   matrix = {
+#     php = get_php_version()
+#     tgt = get_target()
+#   }
+#   args = {
+#     PHP_VERSION = php
+#   }
+#   platforms = [
+#     "linux/amd64",
+#     # uncomment if required
+#     # "linux/arm64",
+#     # "linux/arm/v7",
+#     # "linux/arm/v6",
+#     # "linux/riscv64",
+#     # "linux/s390x",
+#     # "linux/386",
+#     # "linux/ppc64le"
+#   ]
+#   tags = tags(
+#     "-caddy",
+#     tgt
+#   )
+#   labels = labels()
+#   output = ["type=docker"]
+# }
