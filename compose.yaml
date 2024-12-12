@@ -33,22 +33,40 @@ services:
       - no-new-privileges:true
 
   shopware:
-    image: fmjstudios/shopware:latest-nginx
+    image: fmjstudios/shopware:v0.1.0-nginx
     container_name: shopware
-    env_file: ../../.env
+    env_file: .env
     build:
-      context: ../..
-      dockerfile: ../../Dockerfile
-      target: dev
-    restart: always
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+    develop:
+      watch:
+        - action: rebuild
+          path: composer.json
+        - action: sync
+          path: ./custom
+          target: /var/www/html/custom
+          ignore:
+            - vendor/
+        - action: sync
+          path: ./config
+          target: /var/www/html/config
+          ignore:
+            - vendor/
+        - action: sync
+          path: ./public
+          target: /var/www/html/public
+          ignore:
+            - vendor/
+    restart: unless-stopped
     ports:
       - "9161"
-    volumes:
-      - sw-files:/var/www/html/files:rw
-      - sw-theme:/var/www/html/public/theme:rw
-      - sw-media:/var/www/html/public/media:rw
-      - sw-thumbnail:/var/www/html/public/thumbnail:rw
-      - sw-sitemap:/var/www/html/public/sitemap:rw
+    #    volumes:
+    #      - sw-files:/var/www/html/files:rw
+    #      - sw-theme:/var/www/html/public/theme:rw
+    #      - sw-media:/var/www/html/public/media:rw
+    #      - sw-thumbnail:/var/www/html/public/thumbnail:rw
+    #      - sw-sitemap:/var/www/html/public/sitemap:rw
     networks:
       - public
       - internal
@@ -120,6 +138,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # ref: https://hub.docker.com/r/bitnami/redis
+  redis:
+    image: bitnami/redis:6.2
+    restart: always
+    ports:
+      - "6379:6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - redis-data:/bitnami/redis/data
+    networks:
+      - internal
 
   # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
   opensearch:
@@ -207,10 +238,8 @@ services:
       - "9001"
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
-      # MINIO_ACCESS_KEY: ${S3_ACCESS_KEY}
-      # MINIO_SECRET_KEY: ${S3_SECRET_KEY}
+      MINIO_ACCESS_KEY: ${SHOPWARE_S3_ACCESS_KEY:-"shopware"}
+      MINIO_SECRET_KEY: ${SHOPWARE_S3_SECRET_KEY:-"shopwareAccess"}
     volumes:
       - minio-data:/data
     networks:
@@ -227,7 +256,7 @@ services:
       - "traefik.http.routers.minio.service=minio"
       - "traefik.http.services.minio.loadbalancer.server.port=9001"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: [ "CMD", "mc", "ready", "local" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -241,14 +270,14 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set minio http://minio:9000 ${S3_ACCESS_KEY} ${S3_SECRET_KEY};
+      /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ACCESS_KEY:-"shopware"} ${MINIO_SECRET_KEY:-"shopwareAccess"};
       /usr/bin/mc rm -r --force minio/shopware;
       /usr/bin/mc mb minio/shopware;
       /usr/bin/mc anonymous set public minio/shopware;
       exit 0;"
     environment:
-      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY:-"shopware"}
-      MINIO_SECRET_KEY: ${S3_SECRET_KEY:-"shopwareAccess"}
+      MINIO_ACCESS_KEY: ${SHOPWARE_S3_ACCESS_KEY:-"shopware"}
+      MINIO_SECRET_KEY: ${SHOPWARE_S3_SECRET_KEY:-"shopwareAccess"}
     networks:
       - public
     labels:
@@ -337,7 +366,7 @@ services:
   tempo:
     image: grafana/tempo:latest
     container_name: tempo
-    command: ["-config.file=/etc/tempo.yaml"]
+    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - tempo-data:/var/tempo
     ports:
@@ -392,7 +421,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.110.0
     container_name: otel-collector
     restart: always
-    command: ["--config=/etc/otel-collector.yaml"]
+    command: [ "--config=/etc/otel-collector.yaml" ]
     configs:
       - source: otel-collector-config.yaml
         target: /etc/otel-collector.yaml
@@ -411,34 +440,35 @@ services:
 
 configs:
   traefik.yml:
-    file: resources/traefik.yml
+    file: docker/resources/traefik.yml
   traefik-dynamic.yml:
-    file: resources/traefik-dynamic.yml
+    file: docker/resources/traefik-dynamic.yml
   grafana-datasources.yaml:
-    file: resources/grafana-datasources.yaml
+    file: docker/resources/grafana-datasources.yaml
   tempo.yaml:
-    file: resources/tempo.yaml
+    file: docker/resources/tempo.yaml
   prometheus.yaml:
-    file: resources/prometheus.yaml
+    file: docker/resources/prometheus.yaml
   otel-collector-config.yaml:
-    file: resources/otel-collector-config.yaml
+    file: docker/resources/otel-collector-config.yaml
 
 secrets:
   server.pem:
-    file: ../../secrets/ssl/server.pem
+    file: secrets/ssl/server.pem
   server-key.pem:
-    file: ../../secrets/ssl/server-key.pem
+    file: secrets/ssl/server-key.pem
 
 volumes:
-  sw-files:
-  sw-theme:
-  sw-media:
-  sw-thumbnail:
-  sw-sitemap:
+  #  sw-files:
+  #  sw-theme:
+  #  sw-media:
+  #  sw-thumbnail:
+  #  sw-sitemap:
   db-data:
   opensearch-data:
   tempo-data:
   minio-data:
+  redis-data:
 
 networks:
   public:

@@ -1,11 +1,11 @@
-#syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.12.0
+#
+# ref: https://docs.docker.com/build/buildkit/dockerfile-release-notes/
+# Set the Docker syntax version. Limit features to release from 27-11-2024.
 
 ARG PHP_VERSION=8.3
-#ARG NODE_VERSION=22
 
-# lock versions
-#FROM node:${NODE_VERSION}-alpine as node
-FROM php:$PHP_VERSION-fpm-alpine as base
+FROM php:$PHP_VERSION-fpm-alpine AS base
 
 # container settings
 ARG USER=shopware
@@ -58,12 +58,6 @@ RUN apk update && apk add --no-cache \
 RUN curl -L https://raw.githubusercontent.com/renatomefi/php-fpm-healthcheck/master/php-fpm-healthcheck \
     -o /usr/local/bin/php-fpm-healthcheck && \
     chmod +x /usr/local/bin/php-fpm-healthcheck
-
-# install Node.js and the Node package manager
-#COPY --from=node /usr/local/bin/node /usr/local/bin/
-#COPY --from=node /usr/local/bin/npm /usr/local/bin/
-#COPY --from=node /usr/local/bin/npx /usr/local/bin/
-#COPY --from=node /usr/local/lib /usr/local/
 
 # define core environment variables (php-cli, php-fpm, utils.sh)
 ENV PORT="${PORT}" \
@@ -128,7 +122,7 @@ chmod -R 755 /run/php
 chown -R ${PUID}:${PGID} /var/log/php-fpm /var/log/php /var/log/supervisor /var/www/html /run/php
 EOF
 
-FROM base as system
+FROM base AS system
 
 ARG USER
 ARG PORT
@@ -140,7 +134,7 @@ RUN \
 	# Use "useradd ${USER}" for Debian-based distros
 	adduser -D ${USER} -u ${PUID}; \
   addgroup -g ${PGID} -S; \
-	# Give write access to /var/www/html
+	# ensure user 'shopware' owns /var/www/html (and its' children)
 	chown -R ${USER}:${USER} /var/www/html
 
 # add container executables and library scripts
@@ -163,7 +157,8 @@ mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/med
 chown -R ${USER}:${USER} /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
 EOF
 
-# install shopware-cli
+# install Shopware-CLI
+# ref: https://sw-cli.fos.gg/install/
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN set -o pipefail && \
     apk add --no-cache bash && \
@@ -212,6 +207,11 @@ ENV APP_ENV=dev \
     SHOPWARE_S3_SECRET_KEY=CHANGEME \
     SHOPWARE_S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
     SHOPWARE_S3_CDN_URL="https://shop.cdn.fmj.services" \
+    SHOPWARE_S3_USE_PATH_ENDPOINT="true" \
+    # Redis configuration
+    PHP_SESSION_HANDLER="redis" \
+    PHP_SESSION_SAVE_PATH="tcp://redis:6379" \
+    SHOPWARE_REDIS_URL="redis://redis:6379" \
     # settings for installation via deployment-helper
     INSTALL_LOCALE=en-GB \
     INSTALL_CURRENCY=EUR \
@@ -227,7 +227,7 @@ ENTRYPOINT ["swctl"]
 # -------------------------------------
 # DEVELOPMENT Image
 # -------------------------------------
-FROM system as dev
+FROM system AS dev
 
 # (re)-instantiate ARGs
 ARG USER
@@ -253,7 +253,7 @@ CMD ["run"]
 # -------------------------------------
 # PRODUCTION Image
 # -------------------------------------
-FROM system as prod
+FROM system AS prod
 
 # (re)-instantiate ARGs
 ARG USER
@@ -271,19 +271,26 @@ ENV APP_ENV=prod \
     APP_URL_CHECK_DISABLED=1
 
 # production build
-RUN \
-    --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
+RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
     --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.composer \
     --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.npm \
+    # S3 credentials
+    --mount=type=secret,id=SHOPWARE_S3_BUCKET,env=SHOPWARE_S3_BUCKET \
+    --mount=type=secret,id=SHOPWARE_S3_REGION,env=SHOPWARE_S3_REGION \
+    --mount=type=secret,id=SHOPWARE_S3_ACCESS_KEY,env=SHOPWARE_S3_ACCESS_KEY \
+    --mount=type=secret,id=SHOPWARE_S3_SECRET_KEY,env=SHOPWARE_S3_SECRET_KEY \
+    --mount=type=secret,id=SHOPWARE_S3_ENDPOINT,env=SHOPWARE_S3_ENDPOINT \
+    --mount=type=secret,id=SHOPWARE_S3_CDN_URL,env=SHOPWARE_S3_CDN_URL \
+    --mount=type=secret,id=SHOPWARE_S3_USE_PATH_ENDPOINT,env=SHOPWARE_S3_USE_PATH_ENDPOINT \
     shopware-cli project ci .
 
 # (re)-own files
 USER root
-RUN \
-    #chown -R ${PUID}:${PGID} . && \
-    find . -type f -exec chmod 644 {} + && \
-    find . -type d -exec chmod 755 {} + && \
-    setfacl -PRd -m user:${USER}:rwx,group:${USER}:rw,other::r ./files ./var ./public
+RUN <<EOF
+find . -type f -exec chmod 644 {} + && \
+find . -type d -exec chmod 755 {} + && \
+setfacl -PRd -m user:${USER}:rwx,group:${USER}:rw,other::r ./files ./var ./public
+EOF
 
 # switch to unprivileged user
 USER ${USER}

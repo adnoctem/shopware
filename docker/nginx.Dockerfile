@@ -1,12 +1,15 @@
-#syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.12.0
+#
+# ref: https://docs.docker.com/build/buildkit/dockerfile-release-notes/
+# Set the Docker syntax version. Limit features to release from 27-11-2024.
 
 ARG VERSION=0.1.0
 ARG PORT=8000
 ARG USER="shopware"
 
 # lock versions
-FROM fmjstudios/shopware:v${VERSION} as base
-FROM base as system
+FROM fmjstudios/shopware:v${VERSION} AS base
+FROM base AS system
 
 # (re)set args
 ARG USER
@@ -48,7 +51,7 @@ ENTRYPOINT ["swctl"]
 # -------------------------------------
 # PRODUCTION Image
 # -------------------------------------
-FROM system as prod
+FROM system AS prod
 
 # (re)set args
 ARG PORT
