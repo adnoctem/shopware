@@ -30,7 +30,7 @@ variable "DEFAULT_PHP" {
 }
 
 variable "PHP_VERSIONS" {
-  default = "8.2,${DEFAULT_PHP},8.4"
+  default = "8.2,${DEFAULT_PHP}"
 }
 
 # ==== Custom Functions ====
@@ -144,6 +144,15 @@ target "shopware" {
     # "linux/386",
     # "linux/ppc64le"
   ]
+  secret = [
+    "type=env,id=SHOPWARE_S3_BUCKET",
+    "type=env,id=SHOPWARE_S3_REGION",
+    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
+    "type=env,id=SHOPWARE_S3_SECRET_KEY",
+    "type=env,id=SHOPWARE_S3_ENDPOINT",
+    "type=env,id=SHOPWARE_S3_CDN_URL",
+    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
+  ]
   target = tgt
   tags = tags(
     "-fcgi",
@@ -177,6 +186,15 @@ target "shopware-nginx" {
     # "linux/s390x",
     # "linux/386",
     # "linux/ppc64le"
+  ]
+  secret = [
+    "type=env,id=SHOPWARE_S3_BUCKET",
+    "type=env,id=SHOPWARE_S3_REGION",
+    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
+    "type=env,id=SHOPWARE_S3_SECRET_KEY",
+    "type=env,id=SHOPWARE_S3_ENDPOINT",
+    "type=env,id=SHOPWARE_S3_CDN_URL",
+    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
   ]
   tags = tags(
     "-nginx",
