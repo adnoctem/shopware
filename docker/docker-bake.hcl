@@ -24,13 +24,13 @@ variable "REPO" {
   default = "fmjstudios/shopware"
 }
 
-# build for multiple versions - can be a comma-separated list of values like 7.4,8.1,8.2 etc.
+# set a default version
 variable "DEFAULT_PHP" {
   default = "8.3"
 }
 
 variable "PHP_VERSIONS" {
-  default = "8.2,${DEFAULT_PHP}"
+  default = "8.2,${DEFAULT_PHP},8.4"
 }
 
 # ==== Custom Functions ====
