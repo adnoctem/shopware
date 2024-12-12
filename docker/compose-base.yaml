@@ -1,0 +1,67 @@
+services:
+  mysql:
+    image: mysql:${MYSQL_VERSION:-8.0}-oracle
+    container_name: mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shopware}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-shopware}
+      MYSQL_USER: ${MYSQL_USER:-shopware}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
+    volumes:
+      - tmp-db-data:/var/lib/mysql:rw
+      # - ./conf/mysql:/etc/mysql/conf.d
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD:-shopware}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: opensearch
+    ports:
+      - "9200:9200" # REST API
+      - "9600" # Performance Analyzer
+    environment:
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "AShopware6Password!"
+      discovery.type: single-node
+      plugins.security.disabled: true
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - tmp-opensearch-data:/usr/share/opensearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # ref: https://hub.docker.com/r/bitnami/redis
+  redis:
+    image: bitnami/redis:6.2
+    restart: always
+    ports:
+      - "6379:6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - redis-data:/bitnami/redis/data
+
+volumes:
+  tmp-db-data:
+  tmp-opensearch-data:
+  redis-data:
