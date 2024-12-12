@@ -1,0 +1,5 @@
+# configure Shopware to use Redis for Session storage
+# ref: https://developer.shopware.com/docs/guides/hosting/performance/session.html#configure-redis-using-shopware-configuration
+framework:
+  session:
+    handler_id: "%env(SHOPWARE_REDIS_URL)%"

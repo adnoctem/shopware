@@ -1,5 +1,13 @@
 # config/packages/framework.yaml
 framework:
+  # caching
+  cache:
+    default_redis_provider: "%env(string:SHOPWARE_REDIS_URL)%"
+    pools:
+      cache.http:
+        adapter: cache.adapter.redis_tag_aware
+        tags: cache.tags
+
   # shortcut for private IP address ranges of your proxy
   trusted_proxies: "private_ranges"
   # trust *all* "X-Forwarded-*" headers
