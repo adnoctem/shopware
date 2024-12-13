@@ -33,6 +33,16 @@ variable "PHP_VERSIONS" {
   default = "8.2,${DEFAULT_PHP}"
 }
 
+# ==== Environment Variables ====
+variable "SHOPWARE_S3_BUCKET" {}
+variable "SHOPWARE_S3_REGION" {}
+variable "SHOPWARE_S3_ACCESS_KEY" {}
+variable "SHOPWARE_S3_SECRET_KEY" {}
+variable "SHOPWARE_S3_ENDPOINT" {}
+variable "SHOPWARE_S3_CDN_URL" {}
+variable "SHOPWARE_S3_USE_PATH_ENDPOINT" {}
+
+
 # ==== Custom Functions ====
 # determine in which we're going to append for the image
 function "get_registry" {
