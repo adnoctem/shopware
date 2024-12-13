@@ -1,7 +1,7 @@
 # required to be able to build the application without a database
 # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/build-w-o-db.html
-storefront:
-  theme:
-    config_loader_id: Shopware\Storefront\Theme\ConfigLoader\StaticFileConfigLoader
-    available_theme_provider: Shopware\Storefront\Theme\ConfigLoader\StaticFileAvailableThemeProvider
-    theme_path_builder_id: Shopware\Storefront\Theme\MD5ThemePathBuilder
+#storefront:
+#  theme:
+#    config_loader_id: Shopware\Storefront\Theme\ConfigLoader\StaticFileConfigLoader
+#    available_theme_provider: Shopware\Storefront\Theme\ConfigLoader\StaticFileAvailableThemeProvider
+#    theme_path_builder_id: Shopware\Storefront\Theme\MD5ThemePathBuilder
