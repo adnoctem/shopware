@@ -235,8 +235,8 @@ ARG PUID
 ARG PGID
 
 # copy all (non-ignored) sources
+ADD --chown=${PUID}:${PGID} . /var/www/html
 WORKDIR /var/www/html
-COPY --link --chown=${PUID}:${PGID} . ./
 RUN rm -rf ./docker # remove non-ignorable docker dir
 
 ENV APP_ENV=dev
@@ -262,8 +262,8 @@ ARG PGID
 ARG PORT
 
 # doc-root
+COPY --link --chown=${PUID}:${PGID} . /var/www/html
 WORKDIR /var/www/html
-COPY --link --chown=${PUID}:${PGID} . ./
 
 # overwrite defaults
 ENV APP_ENV=prod \
