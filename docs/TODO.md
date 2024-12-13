@@ -15,6 +15,8 @@
 - [ ] Write a `snippet-translator` Plugin
 - [ ] Introduce [validation of Docker
   `bake` variables](https://docs.docker.com/build/bake/variables/#validating-variables)
+- [ ] Finish `bake.sh`
+  with [these improvements](https://stackoverflow.com/questions/19331497/set-environment-variables-from-file-of-key-value-pairs)
 
 ## 💡 Ideas
 
