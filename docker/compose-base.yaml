@@ -53,6 +53,7 @@ services:
   # ref: https://hub.docker.com/r/bitnami/redis
   redis:
     image: bitnami/redis:6.2
+    container_name: redis
     restart: always
     ports:
       - "6379:6379"
@@ -60,6 +61,17 @@ services:
       ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - redis-data:/bitnami/redis/data
+
+  # ref: https://mailpit.axllent.org/docs/configuration/runtime-options/
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
 volumes:
   tmp-db-data:
