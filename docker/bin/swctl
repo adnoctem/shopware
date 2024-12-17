@@ -6,7 +6,7 @@
 # shellcheck disable=SC3040
 set -o errexit -o nounset -o pipefail
 
-# shellcheck source=../lib/utils.sh
+# shellcheck source=docker/lib/utils.sh
 . /usr/local/lib/utils.sh
 
 # ----------------------
@@ -29,10 +29,12 @@ ctl_usage() {
 #   'init' function
 # ----------------------
 
-# Wait for the database to become available since we cannot install anything without it
-# Set up Shopware 6 if an installation is found, otherwise install the application
+# Wait for the Redis, MySQL and ElasticSearch connections to become available since
+# we cannot install anything without them. Afterwards run Shopware's deployment helper
 ctl_init() {
 	database_connection_check
+	redis_connection_check
+	elasticsearch_connection_check
 	deployment_helper
 	log "Completed pre-deployment checks!"
 }

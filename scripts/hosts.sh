@@ -6,17 +6,22 @@
 # Libraries
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
+# shellcheck source=scripts/lib/helpers.sh
+. "${SCRIPT_DIR}/lib/helpers.sh"
+
 # shellcheck source=scripts/lib/paths.sh
 . "${SCRIPT_DIR}/lib/paths.sh"
 
-# shellcheck source=scripts/lib/perm.sh
-. "${SCRIPT_DIR}/lib/perm.sh"
+# shellcheck source=scripts/lib/permissions.sh
+. "${SCRIPT_DIR}/lib/permissions.sh"
 
-# shellcheck source=scripts/lib/log.sh
-. "${SCRIPT_DIR}/lib/log.sh"
+# shellcheck source=scripts/lib/stdout.sh
+. "${SCRIPT_DIR}/lib/stdout.sh"
 
 # Constants
-HOST_CONFIG="/etc/hosts"
+HOST_CONFIGS=(
+	'/etc/hosts'
+)
 
 CONFIG_START="# SHOPWARE MANAGED START"
 CONFIG_END="# SHOPWARE MANAGED END"
@@ -46,8 +51,8 @@ function hosts::usage() {
 	echo
 	echo "Usage: $(basename "${0}") <COMMAND>"
 	echo
-	echo "add     - Insert the new configuration in ${HOST_CONFIG}"
-	echo "remove  - Remove the configuration from ${HOST_CONFIG}"
+	echo "add     - Insert the new configuration in ${HOST_CONFIGS[*]}"
+	echo "remove  - Remove the configuration from ${HOST_CONFIGS[*]}"
 	echo "help    - Print this usage information"
 	echo
 }
@@ -56,16 +61,24 @@ function hosts::usage() {
 #   'add' function
 # ----------------------
 function hosts::add() {
-	log::yellow "Adding custom host configuration to ${HOST_CONFIG}"
-	read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
+	log::yellow "Adding custom host configuration to ${HOST_CONFIGS[*]}"
+	read -rp "Are you sure you want to modify the system host files ${HOST_CONFIGS[*]}? (y/N) " choice
 	case "${choice}" in
 	y | Y)
-		log::green "Confirmed modification to ${HOST_CONFIG}. Installing..."
-		echo "$CONFIG" | perm::run_as_root tee -a "${HOST_CONFIG}" >/dev/null
+		log::green "Confirmed modification to host configuration files. Installing..."
+		for cfg in "${HOST_CONFIGS[@]}"; do
+			if [[ -w "${cfg}" ]]; then
+				log::green "Adding hosts to $cfg as $(whoami)!"
+				echo "$CONFIG" | tee -a "${cfg}" >/dev/null
+			else
+				log::green "Adding hosts to $cfg as root!"
+				echo "$CONFIG" | lib::permissions::run_as_root tee -a "${cfg}" >/dev/null
+			fi
+		done
 		;;
 	*)
-		log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
-		return 0
+		log::yellow "Cancelled modification to host configuration files. No changes made."
+		return 1
 		;;
 	esac
 }
@@ -74,16 +87,28 @@ function hosts::add() {
 #   'remove' function
 # ----------------------
 function hosts::remove() {
-	log::yellow "Removing custom host configuration from ${HOST_CONFIG}"
-	read -rp "Are you sure you want to modify the system host file ${HOST_CONFIG}? (y/N) " choice
+	local sed_result
+
+	log::yellow "Removing custom host configuration from ${HOST_CONFIGS[*]}"
+	read -rp "Are you sure you want to modify the system host file ${HOST_CONFIGS[*]}? (y/N) " choice
 	case "${choice}" in
 	y | Y)
-		log::green "Confirmed modification to ${HOST_CONFIG}. Removing..."
-		perm::run_as_root sed -i "/${CONFIG_START}/,/${CONFIG_END}/d" ${HOST_CONFIG}
+		log::green "Confirmed modification to host configuration files. Removing..."
+		for cfg in "${HOST_CONFIGS[@]}"; do
+			if [[ -w "${cfg}" ]]; then
+				log::green "Removing hosts from $cfg as $(whoami)!"
+				sed_result=$(sed "/${CONFIG_START}/,/${CONFIG_END}/d" "${cfg}")
+				echo "${sed_result}" >"${cfg}"
+			else
+				log::green "Removing hosts from $cfg as root!"
+				sed_result=$(lib::permissions::run_as_root sed "/${CONFIG_START}/,/${CONFIG_END}/d" "${cfg}")
+				echo "${sed_result}" | lib::permissions::run_as_root tee "${cfg}" >/dev/null
+			fi
+		done
 		;;
 	*)
-		log::yellow "Cancelled modification to ${HOST_CONFIG}. No changes made."
-		return 0
+		log::yellow "Cancelled modification to host configuration files. No changes made."
+		return 1
 		;;
 	esac
 }
@@ -93,6 +118,15 @@ function hosts::remove() {
 # --------------------------------
 function main() {
 	local cmd=${1}
+
+	if [[ $# -gt 1 ]]; then
+		HOST_CONFIGS+=("${@:2}")
+	fi
+
+	# add custom environment variable
+	if [[ -n "${EXTRA_HOSTS_PATH}" ]]; then
+		HOST_CONFIGS+=("${EXTRA_HOSTS_PATH}")
+	fi
 
 	case "${cmd}" in
 	add)

@@ -33,17 +33,15 @@ variable "PHP_VERSIONS" {
   default = "8.2,${DEFAULT_PHP}"
 }
 
-# ==== Environment Variables ====
-variable "SHOPWARE_S3_BUCKET" {}
-variable "SHOPWARE_S3_REGION" {}
-variable "SHOPWARE_S3_ACCESS_KEY" {}
-variable "SHOPWARE_S3_SECRET_KEY" {}
-variable "SHOPWARE_S3_ENDPOINT" {}
-variable "SHOPWARE_S3_CDN_URL" {}
-variable "SHOPWARE_S3_USE_PATH_ENDPOINT" {}
-
-
 # ==== Custom Functions ====
+# return the appropriate tag for the image
+function "latest_or_version" {
+  params = [
+    target
+  ]
+  result = target == "dev" ? "${VERSION}-${target}" : VERSION != null ? VERSION : "latest"
+}
+
 # determine in which we're going to append for the image
 function "get_registry" {
   params = []
@@ -94,8 +92,9 @@ function "tags" {
     [
       for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
       flatten([
-          tag == "latest" ? "${REPO}:${tag}" : "",
+          tag == "latest" && target == "prod" ? "${REPO}:${tag}" : "",
           tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix == "-fcgi" && target != "prod" ? "${REPO}:${tag}-${target}" : "",
           tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${REPO}:${tag}${suffix}" : "",
           tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${REPO}:${tag}" : "",
       ])
@@ -104,8 +103,9 @@ function "tags" {
       for rgs in get_registry() : [
       for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
       flatten([
-          tag == "latest" ? "${rgs}/${REPO}:${tag}" : "",
+          tag == "latest" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
           tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix == "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}-${target}" : "",
           tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}${suffix}" : "",
           tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
       ])
@@ -116,32 +116,26 @@ function "tags" {
 
 # ==== Bake Groups ====
 group "default" {
-  targets = ["shopware"]
+  targets = ["shopware-fcgi"]
 }
 
 group "nginx" {
   targets = ["shopware-nginx"]
 }
 
-# group "caddy" {
-#   targets = ["shopware-caddy"]
-# }
+group "aio" {
+  targets = ["shopware-aio", "shopware-nginx-aio"]
+}
 
 group "all" {
-  targets = ["shopware", "shopware-nginx"]
+  targets = ["shopware", "shopware-nginx", "shopware-aio", "shopware-nginx-aio"]
 }
 
 # ==== Bake Targets ====
 # The (base) application image
-target "shopware" {
-  name       = "shopware-php${replace(php, ".", "-")}-${tgt}"
-  dockerfile = "Dockerfile"
-  matrix = {
-    php = get_php_version()
-    tgt = get_target()
-  }
+target "base" {
   args = {
-    PHP_VERSION = php
+    VERSION = VERSION != null ? VERSION : "latest"
   }
   platforms = [
     "linux/amd64",
@@ -154,64 +148,83 @@ target "shopware" {
     # "linux/386",
     # "linux/ppc64le"
   ]
+  # required due to Shopware's need to look up installed plugins and apps
+  # at build time. a previously dumped configuration must exist within the
+  # bucket otherwise the build will fail
   secret = [
-    "type=env,id=SHOPWARE_S3_BUCKET",
-    "type=env,id=SHOPWARE_S3_REGION",
-    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
-    "type=env,id=SHOPWARE_S3_SECRET_KEY",
-    "type=env,id=SHOPWARE_S3_ENDPOINT",
-    "type=env,id=SHOPWARE_S3_CDN_URL",
-    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
+    "type=env,id=S3_PUBLIC_BUCKET",
+    "type=env,id=S3_PRIVATE_BUCKET",
+    "type=env,id=S3_REGION",
+    "type=env,id=S3_ACCESS_KEY",
+    "type=env,id=S3_SECRET_KEY",
+    "type=env,id=S3_ENDPOINT",
+    "type=env,id=S3_CDN_URL",
+    "type=env,id=S3_USE_PATH_STYLE_ENDPOINT",
   ]
+  labels = labels()
+  output = ["type=docker"]
+}
+
+
+target "shopware-fcgi" {
+  name       = "shopware-fcgi-php${replace(php, ".", "-")}-${tgt}"
+  dockerfile = "Dockerfile"
+  inherits = ["base"]
+  matrix = {
+    php = get_php_version()
+    tgt = get_target()
+  }
+  args = {
+    PHP_VERSION = php
+  }
   target = tgt
   tags = tags(
     "-fcgi",
     tgt
   )
-  labels = labels()
-  output = ["type=docker"]
 }
 
 # The Nginx application image
 target "shopware-nginx" {
-  name       = "shopware-nginx-php${replace(php, ".", "-")}-${tgt}"
+  name       = "shopware-nginx-${tgt}"
   dockerfile = "docker/nginx.Dockerfile"
-  contexts = {
-    base = "docker-image://fmjstudios/shopware:latest"
-  }
+  inherits = ["base"]
   matrix = {
-    php = get_php_version()
     tgt = get_target()
   }
-  args = {
-    PHP_VERSION = php
+  contexts = {
+    base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
   }
-  platforms = [
-    "linux/amd64",
-    # uncomment if required
-    # "linux/arm64",
-    # "linux/arm/v7",
-    # "linux/arm/v6",
-    # "linux/riscv64",
-    # "linux/s390x",
-    # "linux/386",
-    # "linux/ppc64le"
-  ]
-  secret = [
-    "type=env,id=SHOPWARE_S3_BUCKET",
-    "type=env,id=SHOPWARE_S3_REGION",
-    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
-    "type=env,id=SHOPWARE_S3_SECRET_KEY",
-    "type=env,id=SHOPWARE_S3_ENDPOINT",
-    "type=env,id=SHOPWARE_S3_CDN_URL",
-    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
-  ]
-  tags = tags(
-    "-nginx",
-    tgt
-  )
-  labels = labels()
-  output = ["type=docker"]
+  # never update latest for a non-fcgi image
+  tags = setsubtract(tags("-nginx", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
+}
+
+# The AIO (all-in-one) application image
+target "shopware-aio" {
+  name       = "shopware-aio-${tgt}"
+  dockerfile = "docker/aio.Dockerfile"
+  inherits = ["base"]
+  matrix = {
+    tgt = get_target()
+  }
+  contexts = {
+    base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
+  }
+  tags = setsubtract(tags("-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
+}
+
+# The Nginx AIO (all-in-one) application image
+target "shopware-nginx-aio" {
+  name       = "shopware-nginx-aio-${tgt}"
+  dockerfile = "docker/aio.Dockerfile"
+  inherits = ["base"]
+  matrix = {
+    tgt = get_target()
+  }
+  contexts = {
+    base = join("", ["docker-image://fmjstudios/shopware:", tgt != "dev" ? "${VERSION}-nginx" : "${VERSION}-nginx-dev"])
+  }
+  tags = setsubtract(tags("-nginx-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
 }
 
 # NOTE: The image using Caddy as the web server is deprecated, due to the DoS possibility with Caddy's
@@ -219,34 +232,4 @@ target "shopware-nginx" {
 # ref: https://github.com/shopware/docker/issues/107
 #
 # The Caddy application image
-# target "shopware-caddy" {
-#   name       = "shopware-caddy-php${replace(php, ".", "-")}"
-#   dockerfile = "docker/caddy.Dockerfile"
-#   contexts = {
-#     base = "docker-image://fmjstudios/shopware:latest"
-#   }
-#   matrix = {
-#     php = get_php_version()
-#     tgt = get_target()
-#   }
-#   args = {
-#     PHP_VERSION = php
-#   }
-#   platforms = [
-#     "linux/amd64",
-#     # uncomment if required
-#     # "linux/arm64",
-#     # "linux/arm/v7",
-#     # "linux/arm/v6",
-#     # "linux/riscv64",
-#     # "linux/s390x",
-#     # "linux/386",
-#     # "linux/ppc64le"
-#   ]
-#   tags = tags(
-#     "-caddy",
-#     tgt
-#   )
-#   labels = labels()
-#   output = ["type=docker"]
-# }
+# target "shopware-caddy" { }

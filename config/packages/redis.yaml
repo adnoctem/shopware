@@ -2,4 +2,4 @@
 # ref: https://developer.shopware.com/docs/guides/hosting/performance/session.html#configure-redis-using-shopware-configuration
 framework:
   session:
-    handler_id: "%env(SHOPWARE_REDIS_URL)%"
+    handler_id: "%env(REDIS_URL)%"

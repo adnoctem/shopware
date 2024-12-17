@@ -5,22 +5,13 @@
 
 ARG PHP_VERSION=8.3
 
-FROM php:$PHP_VERSION-fpm-alpine AS base
-
-# container settings
-ARG USER=shopware
-ARG PUID=1101
-ARG PGID=1101
-ARG PORT=9161
+FROM php:$PHP_VERSION-fpm-alpine AS php-base
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 # install Shopware required PHP extensions and the latest version of Composer
 # ref: https://github.com/mlocati/docker-php-extension-installer
 # ref: https://developer.shopware.com/docs/guides/installation/requirements.html
-RUN curl -sSLf \
-        -o /usr/local/bin/install-php-extensions \
-        https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions && \
-    chmod +x /usr/local/bin/install-php-extensions && \
+RUN  --mount=type=bind,from=mlocati/php-extension-installer:latest,source=/usr/bin/install-php-extensions,target=/usr/local/bin/install-php-extensions \
     install-php-extensions \
         @composer \
         bcmath \
@@ -28,40 +19,31 @@ RUN curl -sSLf \
         intl \
         mysqli \
         pdo_mysql \
-        pcntl \
         sockets \
         bz2 \
-        gmp \
-        soap \
         zip \
-        ffi \
         redis \
         opcache \
         apcu \
-        amqp \
-        sodium \
-        opentelemetry \
-        grpc
+        sodium
 
-# install base dependencies
-RUN apk update && apk add --no-cache \
-    bash=~5.2 \
-    supervisor=~4.2 \
-    jq=~1.7 \
-    busybox \
-    fcgi \
-    nodejs \
-    npm \
-    trurl \
-    acl
+# -------------------------------------
+# PHP configuration
+# -------------------------------------
+FROM php-base AS php
 
-RUN curl -L https://raw.githubusercontent.com/renatomefi/php-fpm-healthcheck/master/php-fpm-healthcheck \
-    -o /usr/local/bin/php-fpm-healthcheck && \
-    chmod +x /usr/local/bin/php-fpm-healthcheck
+ARG EXTRA_PHP_EXTENSIONS="opentelemetry grpc"
+
+RUN  --mount=type=bind,from=mlocati/php-extension-installer:latest,source=/usr/bin/install-php-extensions,target=/usr/local/bin/install-php-extensions \
+    install-php-extensions ${EXTRA_PHP_EXTENSIONS}
+
+ARG PORT=9000
 
 # define core environment variables (php-cli, php-fpm, utils.sh)
 ENV PORT="${PORT}" \
     DATABASE_TIMEOUT=120 \
+    OPENSEARCH_TIMEOUT=120 \
+    REDIS_TIMEOUT=120 \
     PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
     PHP_DISPLAY_ERRORS="Off" \
     PHP_MAX_UPLOAD_SIZE="32M" \
@@ -92,78 +74,121 @@ ENV PORT="${PORT}" \
     PHP_FPM_MAX_REQUESTS=0 \
     PHP_FPM_STATUS_PATH="/-/fpm/status" \
     PHP_FPM_PING_PATH="/-/fpm/ping" \
-    PHP_FPM_ACCESS_LOG="/proc/self/fd/2" \
+    PHP_FPM_ACCESS_LOG="/proc/self/fd/1" \
     PHP_FPM_ERROR_LOG="/proc/self/fd/2" \
     PHP_FPM_LOG_LEVEL="notice" \
     PHP_FPM_DAEMONIZE="no" \
     PHP_FPM_RLIMIT_FILES=8192 \
     PHP_FPM_LOG_LIMIT=8192
 
-# PHP
-RUN rm -rf /usr/local/etc/php/php.ini*
+# Remove default directories (or create required ones)
+RUN rm -rf /usr/local/etc/php/php.ini* ; \
+    rm -rf /usr/local/etc/php-fpm.d/* ; \
+    rm -rf /usr/local/etc/php-fpm.conf* ; \
+    mkdir -p /etc/supervisor/conf.d
+
+# copy config files for PHP, PHP-FPM & Supervisor
 COPY --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
 COPY --chmod=644 docker/conf/php/docker-php.ini /usr/local/etc/php/conf.d
-
-# PHP-FPM
-RUN rm -rf /usr/local/etc/php-fpm.d/* && \
-    rm -rf /usr/local/etc/php-fpm.conf*
-
 COPY --chmod=644 docker/conf/php-fpm/php-fpm.conf /usr/local/etc
 COPY --chmod=644 docker/conf/php-fpm/www.conf /usr/local/etc/php-fpm.d
-
-# Supervisor
-RUN mkdir -p /etc/supervisor /etc/supervisor/conf.d
 COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
 
-# create and own required directories
-RUN <<EOF
-mkdir -p /var/log/php-fpm /var/log/php /var/log/supervisor /var/www/html /run/php
-chmod -R 755 /run/php
-chown -R ${PUID}:${PGID} /var/log/php-fpm /var/log/php /var/log/supervisor /var/www/html /run/php
-EOF
+# -------------------------------------
+# System + Environment configuration
+# -------------------------------------
+FROM php AS system
 
-FROM base AS system
-
-ARG USER
 ARG PORT
-ARG PUID
-ARG PGID
+ARG USER=shopware
+ARG PUID=1001
+ARG PGID=1001
 
-# create (unprivileged) shopware user
+# create (unprivileged) shopware user and create/own required directories
+# NOTE: logs should be redirected to std streams
 RUN \
-	# Use "useradd ${USER}" for Debian-based distros
-	adduser -D ${USER} -u ${PUID}; \
-  addgroup -g ${PGID} -S; \
-	# ensure user 'shopware' owns /var/www/html (and its' children)
-	chown -R ${USER}:${USER} /var/www/html
+    addgroup -g ${PGID} -S ${USER}; \
+	adduser -D ${USER} -G ${USER} -u ${PUID} ; \
+    mkdir -p -m 660 /var/www/html /run/php ; \
+    chown -R ${PUID}:${PGID} /var/www/html /run/php
+
+# configure Shell and install base dependencies
+RUN apk update && apk add --no-cache \
+    bash=~5.2 \
+    supervisor=~4.2 \
+    jq=~1.7 \
+    busybox \
+    fcgi \
+    nodejs \
+    npm \
+    trurl \
+    acl \
+    shadow
+SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+
+# ensure we source the new bashrc even if we're not in a login shell
+# ref: https://stackoverflow.com/questions/38024160/how-to-get-etc-profile-to-run-automatically-in-alpine-docker
+ENV ENV=${HOME}/.bashrc
+
+# set doc-root
+WORKDIR /var/www/html
+
+# switch shells & ensure we source /etc/profile and our utils
+RUN chsh -s /bin/bash shopware ; \
+    chsh -s /bin/bash root ; \
+    echo ". /etc/profile" >> /home/${USER}/.bashrc ; \
+    echo ". /etc/profile" >> /root/.bashrc ; \
+    echo ". /usr/local/lib/utils.sh" >> /home/${USER}/.bashrc ; \
+    echo ". /usr/local/lib/utils.sh" >> /root/.bashrc ; \
+    ln -s /dev/null /home/${USER}/.bash_history ; \
+    ln -s /dev/null /home/${USER}/.ash_history ; \
+    ln -s /dev/null /root/.bash_history ; \
+    ln -s /dev/null /root/.ash_history ; \
+    setfacl -PRd -m user:${USER}:rwx,group:${USER}:rw,other::r .
+
+# Mitigate invalid credentials in Shopware's Flysystem adapter,
+# pre-setting known AWS environment variables to lock credentials,
+# for the underlying AWS PHP SDK.
+#
+# ref: https://github.com/thephpleague/flysystem/issues/1759
+RUN echo -e "\n# DO NOT REMOVE - the AWS SDK requires these\n" >> /etc/profile ; \
+    echo 'export AWS_ACCESS_KEY_ID=$SHOPWARE_S3_ACCESS_KEY' >> /etc/profile ; \
+    echo 'export AWS_SECRET_ACCESS_KEY=$SHOPWARE_S3_SECRET_KEY' >> /etc/profile
 
 # add container executables and library scripts
 COPY --chmod=755 docker/bin/swctl /usr/local/bin
 COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
 
+# switch to unprivileged user
+USER ${PUID}:${PGID}
+
+# NOTE: volumes have largely been deprecated as Shopware now relies on an S3 bucket for remote state
+# VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
+
 # add a healthcheck
-# ref: https://github.com/renatomefi/php-fpm-healthcheck
-ENV FCGI_STATUS_PATH=$PHP_FPM_STATUS_PATH \
-    FCGI_CONNECT="localhost:${PORT}"
-HEALTHCHECK --start-period=3m --timeout=5s --interval=10s --retries=75 \
-   CMD php-fpm-healthcheck || exit 1
+# ref: https://maxchadwick.xyz/blog/getting-the-php-fpm-status-from-the-command-line
+HEALTHCHECK --start-period=3m --timeout=10s --interval=15s --retries=25 \
+   CMD cgi-fcgi -bind -connect ${PHP_FPM_LISTEN} | grep -q "Status" || exit 1
 
-# prepare image for volumes - has to be done before we copy sources
-VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
+# execute 'swctl' by default + expose 9000
+ENTRYPOINT ["swctl"]
+EXPOSE ${PORT}
 
-# create and own directories required by volumes
-RUN <<EOF
-mkdir -p /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
-chown -R ${USER}:${USER} /var/www/html/files /var/www/html/public/theme /var/www/html/public/media /var/www/html/public/thumbnail /var/www/html/public/public
-EOF
+# -------------------------------------
+# Base Shopware configuration
+# -------------------------------------
+FROM system AS base
+
+ARG USER
+ARG PUID
+ARG PGID
 
 # install Shopware-CLI
 # ref: https://sw-cli.fos.gg/install/
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN set -o pipefail && \
-    apk add --no-cache bash && \
-    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash && \
-    apk add --no-cache shopware-cli
+USER root
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash ; \
+    apk add --no-cache shopware-cli ; \
+    npm config set cache "/tmp/npm" --global
 
 # Define Shopware's default settings
 ENV APP_ENV=dev \
@@ -172,8 +197,8 @@ ENV APP_ENV=dev \
     APP_URL_CHECK_DISABLED=1 \
     INSTANCE_ID="" \
     LOCK_DSN=flock \
-    MAILER_DSN=null://localhost \
-    DATABASE_URL=mysql://shopware:shopware@127.0.0.1:3306/shopware \
+    MAILER_DSN=null://null \
+    DATABASE_URL="mysql://shopware:shopware@mysql:3306/shopware" \
     BLUE_GREEN_DEPLOYMENT=0 \
     # HTTP caching settings (disabled by default)
     SHOPWARE_HTTP_CACHE_ENABLED=0 \
@@ -199,100 +224,89 @@ ENV APP_ENV=dev \
     OTEL_LOGS_EXPORTER=otlp \
     OTEL_METRICS_EXPORTER=otlp \
     OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
-    OTEL_EXPORTER_OTLP_ENDPOINT=https://otel-collector:4317 \
+    OTEL_EXPORTER_OTLP_ENDPOINT="https://tempo:4317" \
     # S3 configuration
-    SHOPWARE_S3_BUCKET=shop-cdn-fmjstudios \
-    SHOPWARE_S3_REGION=eu-north-1 \
-    SHOPWARE_S3_ACCESS_KEY=CHANGEME \
-    SHOPWARE_S3_SECRET_KEY=CHANGEME \
-    SHOPWARE_S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
-    SHOPWARE_S3_CDN_URL="https://shop.cdn.fmj.services" \
-    SHOPWARE_S3_USE_PATH_ENDPOINT="true" \
-    # Redis configuration
+    S3_PUBLIC_BUCKET=shop-public \
+    S3_PRIVATE_BUCKET=shop-private \
+    S3_REGION=eu-north-1 \
+    S3_ACCESS_KEY=CHANGEME \
+    S3_SECRET_KEY=CHANGEME \
+    S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
+    S3_CDN_URL="https://shop.cdn.fmj.services" \
+    S3_USE_PATH_STYLE_ENDPOINT="true" \
+    # Redis overrides
     PHP_SESSION_HANDLER="redis" \
     PHP_SESSION_SAVE_PATH="tcp://redis:6379" \
-    SHOPWARE_REDIS_URL="redis://redis:6379" \
-    # settings for installation via deployment-helper
+    REDIS_URL="redis://redis:6379" \
+    # build settings
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    DISABLE_ADMIN_COMPILATION_TYPECHECK=true \
+    # deployment-helper - define defaults
     INSTALL_LOCALE=en-GB \
     INSTALL_CURRENCY=EUR \
-    INSTALL_ADMIN_USERNAME=admin \
-    INSTALL_ADMIN_PASSWORD=shopware
+    SALES_CHANNEL_URL=${APP_URL:-"https://shopware.internal"}
 
-# switch to unprivileged user
-USER ${USER}
-
-# execute 'swctl' by default
-ENTRYPOINT ["swctl"]
+# (re)-switch to unprivileged user
+USER ${PUID}:${PGID}
 
 # -------------------------------------
 # DEVELOPMENT Image
 # -------------------------------------
-FROM system AS dev
+FROM base AS dev
 
 # (re)-instantiate ARGs
-ARG USER
 ARG PUID
 ARG PGID
 
 # copy all (non-ignored) sources
-ADD --chown=${PUID}:${PGID} . /var/www/html
-WORKDIR /var/www/html
-RUN rm -rf ./docker # remove non-ignorable docker dir
-
-ENV APP_ENV=dev
-
+ADD --chown=${PUID}:${PGID} --chmod=740 . .
 RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.composer \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.npm \
-    shopware-cli project ci --with-dev-dependencies .
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/composer \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/npm \
+    shopware-cli project ci --with-dev-dependencies . ; \
+    rm -rf ./docker ; \
+    echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-# switch to unprivileged user
-USER ${USER}
+# initialize and run Shopware
 CMD ["run"]
 
 # -------------------------------------
 # PRODUCTION Image
 # -------------------------------------
-FROM system AS prod
-
+FROM base AS prod
 # (re)-instantiate ARGs
-ARG USER
 ARG PUID
 ARG PGID
-ARG PORT
-
-# doc-root
-COPY --link --chown=${PUID}:${PGID} . /var/www/html
-WORKDIR /var/www/html
 
 # overwrite defaults
 ENV APP_ENV=prod \
     SHOPWARE_HTTP_CACHE_ENABLED=1 \
     APP_URL_CHECK_DISABLED=1
 
-# production build
+# link files for production build
+COPY --link --chown=${PUID}:${PGID} --chmod=740 . .
 RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.composer \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/home/${USER}/.npm \
-    # S3 credentials
-    --mount=type=secret,id=SHOPWARE_S3_BUCKET,env=SHOPWARE_S3_BUCKET \
-    --mount=type=secret,id=SHOPWARE_S3_REGION,env=SHOPWARE_S3_REGION \
-    --mount=type=secret,id=SHOPWARE_S3_ACCESS_KEY,env=SHOPWARE_S3_ACCESS_KEY \
-    --mount=type=secret,id=SHOPWARE_S3_SECRET_KEY,env=SHOPWARE_S3_SECRET_KEY \
-    --mount=type=secret,id=SHOPWARE_S3_ENDPOINT,env=SHOPWARE_S3_ENDPOINT \
-    --mount=type=secret,id=SHOPWARE_S3_CDN_URL,env=SHOPWARE_S3_CDN_URL \
-    --mount=type=secret,id=SHOPWARE_S3_USE_PATH_ENDPOINT,env=SHOPWARE_S3_USE_PATH_ENDPOINT \
-    shopware-cli project ci .
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/composer \
+    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/npm \
+    # (required) S3 credentials
+    --mount=type=secret,id=S3_PUBLIC_BUCKET,env=S3_PUBLIC_BUCKET \
+    --mount=type=secret,id=S3_PRIVATE_BUCKET,env=S3_PRIVATE_BUCKET \
+    --mount=type=secret,id=S3_REGION,env=S3_REGION \
+    --mount=type=secret,id=S3_ACCESS_KEY,env=S3_ACCESS_KEY \
+    --mount=type=secret,id=S3_SECRET_KEY,env=S3_SECRET_KEY \
+    --mount=type=secret,id=S3_ENDPOINT,env=S3_ENDPOINT \
+    --mount=type=secret,id=S3_CDN_URL,env=S3_CDN_URL \
+    --mount=type=secret,id=S3_USE_PATH_STYLE_ENDPOINT,env=S3_USE_PATH_STYLE_ENDPOINT \
+    # mitigate invalid S3 credentials
+    --mount=type=secret,id=S3_ACCESS_KEY,env=AWS_ACCESS_KEY_ID \
+    --mount=type=secret,id=S3_SECRET_KEY,env=AWS_SECRET_ACCESS_KEY \
+    shopware-cli project ci . ; \
+    rm -rf ./docker ; \
+    echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-# (re)-own files
-USER root
-RUN <<EOF
-find . -type f -exec chmod 644 {} + && \
-find . -type d -exec chmod 755 {} + && \
-setfacl -PRd -m user:${USER}:rwx,group:${USER}:rw,other::r ./files ./var ./public
-EOF
-
-# switch to unprivileged user
-USER ${USER}
+# initialize and run Shopware
 CMD ["run"]
-EXPOSE ${PORT}

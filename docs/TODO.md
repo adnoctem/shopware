@@ -17,6 +17,11 @@
   `bake` variables](https://docs.docker.com/build/bake/variables/#validating-variables)
 - [ ] Finish `bake.sh`
   with [these improvements](https://stackoverflow.com/questions/19331497/set-environment-variables-from-file-of-key-value-pairs)
+- [ ] Add a `gosu` entrypoint script to take care of the heavy lifting required at runtime..
+- [ ] Add logic to the `swctl` CLI or it's utility scripts to parse the currently set Sales Channel domain and switch it
+  if it isn't actually the same as `$APP_URL` using the Shopware CLI JSON output with
+  `pc sales-channel:list --output json > /tmp/sw-saleschannel.json` and parsing using jq with this expression:
+  `cat /tmp/sw-saleschannel.json | jq -r '.[] | .domains | keys[0]`
 
 ## 💡 Ideas
 

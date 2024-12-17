@@ -45,6 +45,7 @@ export
 CONFIG_DIR := $(ROOT_DIR)/config
 CONFIG_TLS_DIR := $(CONFIG_DIR)/ssl
 OUTPUT_DIR := $(ROOT_DIR)/dist
+DOCKER_DIR := $(ROOT_DIR)/docker
 SECRETS_DIR := $(ROOT_DIR)/secrets
 SECRETS_TLS_DIR := $(SECRETS_DIR)/ssl
 VENDOR_DIR := $(ROOT_DIR)/vendor
@@ -56,6 +57,7 @@ CI_LINTER_DIR := $(CI_DIR)/linters
 # Configuration files
 MARKDOWNLINT_CONFIG := $(CI_LINTER_DIR)/.markdown-lint.yml
 GITLEAKS_CONFIG := $(CI_LINTER_DIR)/.gitleaks.toml
+BAKE_CONFIG := $(DOCKER_DIR)/docker-bake.hcl
 
 FIND_FLAGS := -maxdepth 1 -mindepth 1 -type d -exec \basename {} \;
 TAR_EXCLUDE_FLAGS := --exclude='./docker' --exclude='./secrets' --exclude='./.github' --exclude='./dist' --exclude-from'=./.gitignore'
@@ -82,13 +84,15 @@ EXECUTABLES := $(docker) $(php) $(composer) $(kind) $(node) $(cfssl) $(pre-commi
 # ---------------------------
 PRINT_HELP ?=
 ENV ?= dev
-TAG ?= v$(VERSION)
+TAG ?= $(VERSION)
+TARGET ?= default
 APP ?= shopware
 CI ?= n
 
 # Docker image
 PHP_VERSION ?= 8.3
 PORT ?= 9161
+BAKE_ARGS ?=
 
 # ---------------------------
 # Custom functions
@@ -265,6 +269,22 @@ image:
 	 	--build-arg PHP_VERSION=$(PHP_VERSION) .
 endif
 
+define BAKE_INFO
+# Bake Docker images.
+endef
+.PHONY: bake
+.ONESHELL:
+ifeq ($(PRINT_HELP), y)
+bake:
+	echo "$$BAKE_INFO"
+else
+bake:
+	$(call log_notice, "Baking Docker images for target: $(TARGET)!")
+	export $(shell grep -v '^#' .env | xargs)
+	export VERSION=$(TAG)
+	@$(docker) buildx bake --file $(BAKE_CONFIG) $(TARGET) --builder default $(BAKE_ARGS)
+endif
+
 define BUNDLE_INFO
 # Build a Tarball bundle of the project's sources.
 endef
@@ -313,7 +333,7 @@ endef
 .PHONY: start
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
-	@$(docker) compose up -d
+	@$(docker) compose --file docker/compose-base.yaml up -d
 	@$(composer) run deployment-helper
 	@symfony server:start -d --no-tls --allow-http
 	@symfony server:log
@@ -322,7 +342,7 @@ start:
 stop:
 	$(call log_notice, "Stopping Shopware on local Symfony development server!")
 	@symfony server:stop
-	@$(docker) compose down
+	@$(docker) compose --file docker/compose-base.yaml down -v
 
 #.PHONY: compose
 #compose:
@@ -369,9 +389,14 @@ dumps:
 	php bin/console bundle:dump
 
 .PHONY: mysql-backup
-mysql-backup: secrets-dir
+mysql-backup:
 	$(call log_notice, "Creating a backup of Shopware\'s MySQL database")
-	@docker exec mysql mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
+	@docker exec mysql /usr/bin/mysqldump -u root --password=shopware shopware > $(SECRETS_DIR)/backup.sql
+
+.PHONY: mysql-import
+mysql-import:
+	$(call log_notice, "Creating a backup of Shopware\'s MySQL database")
+	cat $(SECRETS_DIR)/backup.sql | docker exec -i mysql /usr/bin/mysql -u root --password=shopware shopware
 
 # ---------------------------
 # Credentials & Secrets

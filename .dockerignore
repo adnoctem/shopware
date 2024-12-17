@@ -3,6 +3,7 @@
 .vscode
 .git
 .*ignore
+.*lock
 .releaserc
 .*.{yaml,yml}
 .*.txt
@@ -15,6 +16,8 @@
 Makefile
 Dockerfile
 /bin/*.sh
+!/bin/ci
+!/bin/console
 /deploy
 *compose-override.yaml
 config/k8s

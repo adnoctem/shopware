@@ -4,6 +4,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: check-yaml
+        exclude: (^deploy/.*/*.yaml|^deploy/.*/)
       - id: end-of-file-fixer
       - id: trailing-whitespace
   - repo: https://github.com/markdownlint/markdownlint

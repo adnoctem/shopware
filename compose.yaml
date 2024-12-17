@@ -8,6 +8,7 @@ services:
       - "443:443"
       - "8080:8080"
     volumes:
+      - "./secrets/ssl:/etc/traefik/ssl"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - public
@@ -24,43 +25,38 @@ services:
         target: /etc/traefik/traefik.yml
       - source: traefik-dynamic.yml
         target: /etc/traefik/traefik-dynamic.yml
-    secrets:
-      - source: server.pem
-        target: /etc/ssl/traefik/server.pem
-      - source: server-key.pem
-        target: /etc/ssl/traefik/server-key.pem
     security_opt:
       - no-new-privileges:true
 
   shopware:
-    image: fmjstudios/shopware:v0.1.0-nginx
+    image: fmjstudios/shopware:0.1.1-nginx
     container_name: shopware
     env_file: .env
-    build:
-      context: .
-      dockerfile: docker/nginx.Dockerfile
-    develop:
-      watch:
-        - action: rebuild
-          path: composer.json
-        - action: sync
-          path: ./custom
-          target: /var/www/html/custom
-          ignore:
-            - vendor/
-        - action: sync
-          path: ./config
-          target: /var/www/html/config
-          ignore:
-            - vendor/
-        - action: sync
-          path: ./public
-          target: /var/www/html/public
-          ignore:
-            - vendor/
+    #    build:
+    #      context: .
+    #      dockerfile: docker/nginx.Dockerfile
+    #    develop:
+    #      watch:
+    #        - action: rebuild
+    #          path: composer.json
+    #        - action: sync
+    #          path: ./custom
+    #          target: /var/www/html/custom
+    #          ignore:
+    #            - vendor/
+    #        - action: sync
+    #          path: ./config
+    #          target: /var/www/html/config
+    #          ignore:
+    #            - vendor/
+    #        - action: sync
+    #          path: ./public
+    #          target: /var/www/html/public
+    #          ignore:
+    #            - vendor/
     restart: unless-stopped
     ports:
-      - "9161"
+      - "8000"
     #    volumes:
     #      - sw-files:/var/www/html/files:rw
     #      - sw-theme:/var/www/html/public/theme:rw
@@ -80,7 +76,7 @@ services:
       #- "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.internal"
       - "traefik.http.routers.shopware.rule=Host(`shopware.internal`)"
       - "traefik.http.routers.shopware.service=shopware"
-      - "traefik.http.services.shopware.loadbalancer.server.port=9161"
+      - "traefik.http.services.shopware.loadbalancer.server.port=8000"
       - "traefik.http.services.shopware.loadbalancer.sticky=true"
       - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
     healthcheck:
@@ -89,7 +85,7 @@ services:
           "CMD",
           "curl",
           "--fail",
-          "http://localhost:9161/api/_info/health-check",
+          "http://localhost:8000/api/_info/health-check",
         ]
       start_period: 3m
       interval: 1m
@@ -118,7 +114,9 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
     volumes:
       - db-data:/var/lib/mysql:rw
-      - ./docker/conf/mysql/my.cnf:/etc/mysql/my.cnf
+    configs:
+      - source: my.cnf
+        target: /etc/mysql/my.cnf
     networks:
       - internal
     labels:
@@ -142,6 +140,7 @@ services:
   # ref: https://hub.docker.com/r/bitnami/redis
   redis:
     image: bitnami/redis:6.2
+    container_name: redis
     restart: always
     ports:
       - "6379:6379"
@@ -451,12 +450,16 @@ configs:
     file: docker/resources/prometheus.yaml
   otel-collector-config.yaml:
     file: docker/resources/otel-collector-config.yaml
+  my.cnf:
+    file: docker/resources/my.cnf
 
-secrets:
-  server.pem:
-    file: secrets/ssl/server.pem
-  server-key.pem:
-    file: secrets/ssl/server-key.pem
+# cannot be created inline reliably, because they produce a mount error with Docker Desktop + WSL2
+# ERROR: response from daemon: path /.../home/fmj/Software/Code/FMJStudios/shopware/secrets/ssl/server.pem is mounted on / but it is not a shared mount.
+#secrets:
+#  traefik-server.pem:
+#    file: ./secrets/ssl/server.pem
+#  traefik-server-key.pem:
+#    file: ./secrets/ssl/server-key.pem
 
 volumes:
   #  sw-files:

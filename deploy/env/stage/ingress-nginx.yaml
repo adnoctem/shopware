@@ -1,0 +1,6 @@
+controller:
+  watchIngressWithoutClass: true
+  config:
+    enable-real-ip: "true"
+    # forwarded-for-header: "X-Real-IP"
+    allow-snippet-annotations: true

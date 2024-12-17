@@ -1,0 +1,20 @@
+---
+releases:
+  # ref: https://artifacthub.io/packages/helm/bitnami/redis
+  - chart: bitnami/redis
+    name: shopware-redis
+    labels:
+      app: shopware-redis
+      release: shopware
+      group: auth
+    namespace: shopware
+    version: 20.6.0
+    installed: true
+    hooks:
+      - events: [ "postsync" ]
+        showlogs: true
+        command: "kubectl"
+        args: [ "apply", "-k", "kustomize" ]
+    values:
+      - metrics:
+          enabled: true

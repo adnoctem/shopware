@@ -1,0 +1,62 @@
+repositories:
+  - name: ingress-nginx # Nginx Ingress Controller
+    url: https://kubernetes.github.io/ingress-nginx
+
+  - name: jetstack # Certificate Manager (TLS)
+    url: https://charts.jetstack.io
+
+  - name: prometheus-community # Grafana, Prometheus, Alertmanager
+    url: https://prometheus-community.github.io/helm-charts
+
+  - name: grafana # Grafana Loki
+    url: https://grafana.github.io/helm-charts
+
+  #  - name: cloudnative-pg # Cloud-Native PostgreSQL Clusters
+  #    url: https://cloudnative-pg.io/charts/
+
+  - name: metrics-server # Kubernetes SIGs Metrics Server
+    url: https://kubernetes-sigs.github.io/metrics-server/
+
+  - name: bitnami # Redis
+    url: registry-1.docker.io/bitnamicharts
+    oci: true
+    passCredentials: false
+
+  # - name: cloudflare-exporter # CF Exporter for Prometheus
+  #   url: https://lablabs.github.io/cloudflare-exporter/
+
+  - name: vmware-tanzu # Velero
+    url: https://vmware-tanzu.github.io/helm-charts
+
+  #  - name: external-dns
+  #    url: https://kubernetes-sigs.github.io/external-dns/
+
+  - name: emberstack
+    url: https://emberstack.github.io/helm-charts
+
+  - name: crowdsec
+    url: https://crowdsecurity.github.io/helm-charts
+
+  - name: falcosecurity
+    url: https://falcosecurity.github.io/charts
+
+  - name: kubescape
+    url: https://kubescape.github.io/helm-charts/
+
+  - name: cilium
+    url: https://helm.cilium.io
+
+  - name: jaegertracing
+    url: https://jaegertracing.github.io/helm-charts
+
+  - name: elastic
+    url: https://helm.elastic.co
+
+  - name: opentelemetry
+    url: https://open-telemetry.github.io/opentelemetry-helm-charts
+
+  - name: fmjstudios
+    url: https://fmjstudios.github.io/helm
+
+  - name: percona
+    url: https://percona.github.io/percona-helm-charts/
