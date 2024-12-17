@@ -1,3 +1,4 @@
+# ref: https://github.com/opensearch-project/opensearch-k8s-operator/blob/main/docs/userguide/main.md
 apiVersion: opensearch.opster.io/v1
 kind: OpenSearchCluster
 metadata:
@@ -5,29 +6,33 @@ metadata:
   namespace: shopware
 spec:
   general:
+    version: 2.8.0
     httpPort: 9200
-    serviceName: shopware-opensearch
-    version: 2.18.0
     vendor: opensearch
     setVMMaxMapCount: true
+    serviceName: opensearch
+  #    monitoring:
+  #      enable: true
+  #    pluginsList: [ "https://github.com/Aiven-Open/prometheus-exporter-plugin-for-opensearch/releases/download/2.8.0.0/prometheus-exporter-2.8.0.0.zip" ]
   security:
     config:
-      ## take a look at opensearch-k8s-operator/docs/userguide/main.md (Custom admin user)
       adminCredentialsSecret:
-        name: shopware-opensearch-credentials
-        # securityConfigSecret:
-        #name: securityconfig-secret
-    tls:
-      transport:
-        generate: true
-      http:
-        generate: true
+        name: shopware-opensearch-credentials  # The secret with the admin credentials for the operator to use
+      securityConfigSecret:
+        name: shopware-opensearch-securityconfig
+      #    tls:
+      #      http:
+      #        generate: true
+      #      transport:
+      #        generate: true
+      #        perNode: true
   dashboards:
-    opensearchCredentialsSecret:
-      name: shopware-opensearch-credentials
-    version: 2.18.0
+    version: 2.8.0
     enable: true
-    replicas: 2
+    replicas: 1
+    #    env:
+    #      - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    #        value: admin123
     resources:
       requests:
         memory: "1Gi"
@@ -39,57 +44,45 @@ spec:
     smartScaler: true
   nodePools:
     - component: masters
+      pdb:
+        enable: true
+        minAvailable: 1
       replicas: 3
       diskSize: "30Gi"
       nodeSelector:
-      persistence:
-        pvc:
-          storageClass: gp3
-          accessModes:
-            - ReadWriteOnce
       resources:
         requests:
           memory: "2Gi"
-          cpu: "750m"
+          cpu: "500m"
         limits:
           memory: "2Gi"
-          cpu: "750m"
+          cpu: "500m"
       roles:
-        - "master"
+        - "cluster_manager"
         - "data"
     - component: nodes
       replicas: 3
       diskSize: "30Gi"
       nodeSelector:
-      persistence:
-        pvc:
-          storageClass: gp3
-          accessModes:
-            - ReadWriteOnce
       resources:
         requests:
           memory: "2Gi"
-          cpu: "750m"
+          cpu: "500m"
         limits:
           memory: "2Gi"
-          cpu: "750m"
+          cpu: "500m"
       roles:
         - "data"
     - component: coordinators
       replicas: 3
       diskSize: "30Gi"
       nodeSelector:
-      persistence:
-        pvc:
-          storageClass: gp3
-          accessModes:
-            - ReadWriteOnce
       resources:
         requests:
-          memory: "1Gi"
+          memory: "2Gi"
           cpu: "500m"
         limits:
-          memory: "1Gi"
+          memory: "2Gi"
           cpu: "500m"
       roles:
         - "ingest"

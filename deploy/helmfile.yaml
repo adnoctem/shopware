@@ -141,6 +141,8 @@ releases:
     needs:
       - cert-manager/cert-manager
       - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/opensearch-operator.yaml
 
   # ref: https://github.com/percona/percona-helm-charts/tree/main/charts/pxc-operator
   - chart: percona/pxc-operator
