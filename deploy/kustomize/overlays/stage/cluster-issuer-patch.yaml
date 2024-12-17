@@ -1,0 +1,32 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: zerossl-staging-issuer
+  namespace: cert-manager
+  labels:
+    fmj.dev/env: stage
+    fmj.dev/component: cert-manager
+spec:
+  $patch: replace
+  acme:
+    # ZeroSSL ACME server
+    server: https://acme.zerossl.com/v2/DV90
+    email: maximilian.gindorfer@delta4x4.com
+
+    # name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: zerossl-pki-credentials
+
+    # for each cert-manager new EAB credentials are required
+    externalAccountBinding:
+      keyID: Rmhz63z3cKxco4q48_L9SA
+      keySecretRef:
+        name: zerossl-eab-credentials
+        key: hmac
+      keyAlgorithm: HS256
+
+    # ACME DNS-01 provider configurations to verify domain
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

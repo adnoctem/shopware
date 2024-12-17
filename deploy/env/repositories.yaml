@@ -28,6 +28,7 @@ repositories:
   - name: vmware-tanzu # Velero
     url: https://vmware-tanzu.github.io/helm-charts
 
+  # We use the Bitnami Chart
   #  - name: external-dns
   #    url: https://kubernetes-sigs.github.io/external-dns/
 
@@ -60,3 +61,6 @@ repositories:
 
   - name: percona
     url: https://percona.github.io/percona-helm-charts/
+
+  - name: opensearch-operator
+    url: https://opensearch-project.github.io/opensearch-k8s-operator/

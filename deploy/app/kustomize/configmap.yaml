@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: shopware-fcgi-params
-  namespace: shopware
-data:
-  SCRIPT_FILENAME: "/var/www/html/index.php"

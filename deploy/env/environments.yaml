@@ -1,0 +1,8 @@
+environments:
+  dev:
+    values: [ ]
+    secrets: [ ]
+
+  stage:
+    values: [ ]
+    secrets: [ ]

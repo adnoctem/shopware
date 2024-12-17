@@ -1,0 +1,9 @@
+manager:
+  collectorImage:
+    repository: otel/opentelemetry-collector-contrib
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    defaultRules:
+      enabled: true

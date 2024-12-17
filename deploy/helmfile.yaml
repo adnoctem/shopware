@@ -13,6 +13,10 @@ helmDefaults:
   recreatePods: false
   createNamespace: true
 
+bases:
+  - {{ $envDir }}/repositories.yaml
+  - {{ $envDir }}/environments.yaml
+
 helmfiles:
   - {{ $appDir }}/helmfile.yaml
 
@@ -32,20 +36,66 @@ releases:
     namespace: cert-manager
     version: 1.16.2
     installed: true
+    disableValidationOnInstall: true
     hooks:
       - events: [ "postsync" ]
         showlogs: true
         command: "kubectl"
-        args: [ "apply", "-k", "kustomize" ]
+        args: [ "apply", "-k", "kustomize/overlays/{{`{{ .Environment.Name }}`}}" ]
+    labels:
+      release: cert-manager
+    needs:
+      - ingress-nginx/ingress-nginx
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/cert-manager.yaml
 
+  # ref: https://artifacthub.io/packages/helm/bitnami/external-dns
+  - chart: bitnami/external-dns
+    name: external-dns
+    namespace: external-dns
+    version: 8.7.0
+    {{- if eq .Environment.Name "dev" }}
+    installed: false
+    {{ else }}
+    installed: true
+    {{- end }}
+    disableValidationOnInstall: true
+    labels:
+      release: external-dns
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/external-dns.yaml
+
+  # ref: https://artifacthub.io/packages/helm/metrics-server/metrics-server
+  - chart: metrics-server/metrics-server
+    name: metrics-server
+    namespace: metrics-server
+    version: 3.12.2
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      release: metrics-server
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/metrics-server.yaml
+
   # ref: https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  - chart: opentelemetry/kube-prometheus-stack
+  - chart: prometheus-community/kube-prometheus-stack
     name: kube-prometheus-stack
     namespace: kube-prometheus-stack
     version: 67.2.0
     installed: true
+    disableValidationOnInstall: true
+    labels:
+      release: kube-prometheus-stack
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+      - metrics-server/metrics-server
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/kube-prometheus-stack.yaml
 
@@ -55,6 +105,12 @@ releases:
     namespace: opentelemetry-operator
     version: 0.75.1
     installed: true
+    disableValidationOnInstall: true
+    labels:
+      release: opentelemetry-operator
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/opentelemetry-operator.yaml
 
@@ -63,9 +119,28 @@ releases:
     name: eck-operator
     namespace: eck-operator
     version: 2.15.0
-    installed: true
+    installed: false
+    disableValidationOnInstall: true
+    labels:
+      release: eck-operator
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/eck-operator.yaml
+
+  # ref: https://github.com/opensearch-project/opensearch-k8s-operator/tree/main/charts/opensearch-operator
+  - chart: opensearch-operator/opensearch-operator
+    name: opensearch-operator
+    namespace: opensearch-operator
+    version: 2.7.0
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      release: opensearch-operator
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
 
   # ref: https://github.com/percona/percona-helm-charts/tree/main/charts/pxc-operator
   - chart: percona/pxc-operator
@@ -73,5 +148,11 @@ releases:
     namespace: pxc-operator
     version: 1.15.1
     installed: true
+    disableValidationOnInstall: true
+    labels:
+      release: pxc-operator
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/pxc-operator.yaml

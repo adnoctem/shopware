@@ -5,9 +5,10 @@ metadata:
   namespace: shopware
 spec:
   selector:
+    app.kubernetes.io/component: shop
     app.kubernetes.io/name: shopware
   ports:
-    - name: fcgi
+    - name: http
       protocol: TCP
       port: 9000
-      targetPort: 9161
+      targetPort: 8000

@@ -165,7 +165,7 @@ target "base" {
   output = ["type=docker"]
 }
 
-
+# Basic Shopware image exposing PHP-FPM's FCGI listener
 target "shopware-fcgi" {
   name       = "shopware-fcgi-php${replace(php, ".", "-")}-${tgt}"
   dockerfile = "Dockerfile"
@@ -184,7 +184,7 @@ target "shopware-fcgi" {
   )
 }
 
-# The Nginx application image
+# Shopware image exposing Nginx's listener
 target "shopware-nginx" {
   name       = "shopware-nginx-${tgt}"
   dockerfile = "docker/nginx.Dockerfile"

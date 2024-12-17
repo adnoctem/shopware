@@ -4,9 +4,7 @@ metadata:
   name: shopware
   namespace: shopware
   annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "FCGI"
-    nginx.ingress.kubernetes.io/fastcgi-index: "index.php"
-    nginx.ingress.kubernetes.io/fastcgi-params-configmap: "shopware-fcgi-params"
+    cert-manager.io/cluster-issuer: zerossl-staging-issuer
 spec:
   ingressClassName: nginx
   rules:
@@ -16,6 +14,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: showpare
+                name: shopware
                 port:
-                  number: 80
+                  name: http
+                  number: 9000

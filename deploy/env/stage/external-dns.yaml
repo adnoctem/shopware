@@ -1,0 +1,9 @@
+sources:
+  - ingress
+provider: cloudflare
+cloudflare:
+  secretName: cloudflare-api-credentials
+  email: maximilian.gindorfer@delta4x4.com
+  proxied: false
+domainFilers:
+  - delta4x4.dev

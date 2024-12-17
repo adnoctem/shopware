@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: shop
+    app.kubernetes.io/instance: shopware
+    app.kubernetes.io/managed-by: Kustomize
+    app.kubernetes.io/name: shopware
+    app.kubernetes.io/part-of: shopware
+    app.kubernetes.io/version: 0.2.0
+  name: shopware
+  namespace: shopware
+spec:
+  # replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: shop
+      app.kubernetes.io/instance: shopware
+      app.kubernetes.io/name: shopware
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: shop
+        app.kubernetes.io/instance: shopware
+        app.kubernetes.io/managed-by: Kustomize
+        app.kubernetes.io/name: shopware
+        app.kubernetes.io/part-of: shopware
+        app.kubernetes.io/version: 0.2.0
+    spec:
+      serviceAccountName: shopware
+      terminationGracePeriodSeconds: 400
+      containers:
+        - name: shopware
+          image: ghcr.io/fmjstudios/shopware:0.2.0-nginx
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: shopware-config
+                optional: false
+            - secretRef:
+                name: shopware-s3-credentials
+                optional: false
+          env:
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-secret
+                  key: secret
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-db-credentials
+                  key: url
+            - name: MAILER_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-smtp-credentials
+                  key: dsn
+            - name: LOCK_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-lock-credentials
+                  key: dsn
+            - name: OPENSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-es-credentials
+                  key: url
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-s3-credentials
+                  key: S3_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-s3-credentials
+                  key: S3_SECRET_KEY
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shopware-redis-credentials
+                  key: url
+      initContainers:
+        - name: message-workers
+          image: ghcr.io/fmjstudios/shopware:0.2.0-nginx
+          restartPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - php /var/www/html/bin/console messenger:consume --time-limit=360 --memory-limit=512M async low_priority
+        - name: cron-workers
+          image: ghcr.io/fmjstudios/shopware:0.2.0-nginx
+          restartPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - php /var/www/html/bin/console scheduled-task:run --no-wait
+          startupProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/_info/health-check
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1

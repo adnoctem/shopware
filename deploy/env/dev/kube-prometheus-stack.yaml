@@ -1,0 +1,44 @@
+# lock defaults
+crds:
+  enabled: true
+
+alertmanager:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: nameOfClusterIssuer
+    hosts:
+      - alertmanager.shopware.internal
+    paths:
+      - /
+    tls:
+      - secretName: alertmanager-ingress-tls
+        hosts:
+          - alertmanager.shopware.internal
+
+grafana:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: nameOfClusterIssuer
+    hosts:
+      - grafana.shopware.internal
+    path: /
+    tls:
+      - secretName: grafana-ingress-tls
+        hosts:
+          - grafana.shopware.internal
+
+prometheus:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: nameOfClusterIssuer
+    hosts:
+      - prometheus.shopware.internal
+    paths:
+      - /
+    tls:
+      - secretName: prometheus-ingress-tls
+        hosts:
+          - prometheus.shopware.internal

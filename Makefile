@@ -124,6 +124,22 @@ define log_attention
  $(call log, $(1), "red")
 endef
 
+define DEV_KUSTOMIZATION
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+secretGenerator:
+  - name: root-ca
+    type: "kubernetes.io/tls"
+    namespace: cert-manager
+    files:
+      - tls.crt=ca.pem
+      - tls.key=ca-key.pem
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
+endef
+
 # ---------------------------
 #   Development Environment
 # ---------------------------
@@ -404,6 +420,8 @@ mysql-import:
 
 .PHONY: secrets
 secrets: secrets-dir secrets-gen-ca secrets-gen-server
+	$(call log_notice, "Creating development Kustomization!")
+	$(file > $(SECRETS_TLS_DIR)/kustomization.yaml,$(DEV_KUSTOMIZATION))
 
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv

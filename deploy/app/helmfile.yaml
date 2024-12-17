@@ -4,17 +4,15 @@ releases:
   - chart: bitnami/redis
     name: shopware-redis
     labels:
-      app: shopware-redis
       release: shopware
-      group: auth
     namespace: shopware
     version: 20.6.0
-    installed: true
+    installed: false
     hooks:
       - events: [ "postsync" ]
         showlogs: true
         command: "kubectl"
-        args: [ "apply", "-k", "kustomize" ]
+        args: [ "apply", "-k", "kustomize/overlays/{{`{{ .Environment.Name }}`}}" ]
     values:
       - metrics:
           enabled: true

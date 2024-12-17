@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopware-config
+  namespace: shopware
+data:
+  APP_ENV: "dev"
+  APP_URL: "https://shop.delta4x4.dev"
+  BLUE_GREEN_DEPLOYMENT: "0"
+  INSTANCE_ID: "YDCrBocYLgAb1ef3Yv31e2fnicLiOpXw"
+  STOREFRONT_PROXY_URL: "https://shop.delta4x4.dev"
+  # ElasticSearch
+  SHOPWARE_ES_ENABLED: "1"
+  SHOPWARE_ES_INDEXING_ENABLED: "1"
+  SHOPWARE_ES_INDEX_PREFIX: "sw"
+  SHOPWARE_ES_THROW_EXCEPTION: "1"
+  # HTTP Cache
+  SHOPWARE_HTTP_CACHE_ENABLED: "0"
+  SHOPWARE_HTTP_DEFAULT_TTL: "7200"
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://opentelemetry-collector:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_PHP_AUTOLOAD_ENABLED: "true"
+  OTEL_PHP_DISABLED_INSTRUMENTATIONS: ""
+  OTEL_SERVICE_NAME: "shopware"
+  OTEL_TRACES_EXPORTER: "otlp"
+  # S3
+  S3_PUBLIC_BUCKET: "shop-cdn-beta"
+  S3_PRIVATE_BUCKET: "shop-private"
+  S3_REGION: "auto"
+  S3_CDN_URL: "https://shop.cdn.beta.delta4x4.dev"
+  S3_ENDPOINT: "https://b4887c6c0e759a65b6c9219d829c3887.r2.cloudflarestorage.com"
+  S3_USE_PATH_STYLE_ENDPOINT: "true"

@@ -1,3 +1,4 @@
-installCRDs: true
+crds:
+  enabled: true
 ingressShim:
   defaultIssuerKind: ClusterIssuer

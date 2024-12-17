@@ -1,10 +1,11 @@
+# dot-files etc.
 .idea
 .github
 .vscode
 .git
 .*ignore
 .*lock
-.releaserc
+.release*
 .*.{yaml,yml}
 .*.txt
 .*.cache
@@ -12,20 +13,29 @@
 *.xml.dist
 .pre-commit*.yaml
 .env*
-.env.template
-Makefile
-Dockerfile
-/bin/*.sh
-!/bin/ci
-!/bin/console
-/deploy
-*compose-override.yaml
-config/k8s
-config/ssl
+*compose*.yaml
 README.md
 LICENSE
+Makefile
+Dockerfile
+
+# build and dev scripts
+/bin/*.sh
+
+# ensure these stay
+!.htaccess
+!/bin/ci
+!/bin/console
+
+# directories
+/deploy
 /secrets
 /docs
 /tests
 /scripts
 /vendor
+
+# (sub)-directories
+/config/cluster
+/config/ssl
+/config/jwt
