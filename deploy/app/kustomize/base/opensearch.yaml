@@ -16,17 +16,20 @@ spec:
   #    pluginsList: [ "https://github.com/Aiven-Open/prometheus-exporter-plugin-for-opensearch/releases/download/2.8.0.0/prometheus-exporter-2.8.0.0.zip" ]
   security:
     config:
-      adminCredentialsSecret:
-        name: shopware-opensearch-credentials  # The secret with the admin credentials for the operator to use
-      securityConfigSecret:
-        name: shopware-opensearch-securityconfig
-      #    tls:
-      #      http:
-      #        generate: true
-      #      transport:
-      #        generate: true
-      #        perNode: true
+    #      adminCredentialsSecret:
+    #        name: shopware-opensearch-credentials  # The secret with the admin credentials for the operator to use
+    #      securityConfigSecret:
+    #        name: shopware-opensearch-securityconfig
+    tls:
+      http:
+        generate: true
+      transport:
+        generate: true
+        perNode: true
   dashboards:
+    tls:
+      enable: true
+      generate: true
     version: 2.8.0
     enable: true
     replicas: 1
