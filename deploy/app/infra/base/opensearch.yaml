@@ -1,0 +1,93 @@
+# ref: https://github.com/opensearch-project/opensearch-k8s-operator/blob/main/docs/userguide/main.md
+apiVersion: opensearch.opster.io/v1
+kind: OpenSearchCluster
+metadata:
+  name: shopware-opensearch
+  namespace: shopware
+  labels:
+    fmj.dev/component: shopware-opensearch
+spec:
+  general:
+    version: 2.18.0
+    httpPort: 9200
+    vendor: opensearch
+    setVMMaxMapCount: true
+    serviceName: shopware-opensearch
+  #    monitoring:
+  #      enable: true
+  #    pluginsList: [ "https://github.com/Aiven-Open/prometheus-exporter-plugin-for-opensearch/releases/download/2.8.0.0/prometheus-exporter-2.8.0.0.zip" ]
+  security:
+    config:
+    #      adminCredentialsSecret:
+    #        name: shopware-opensearch-credentials  # The secret with the admin credentials for the operator to use
+    #      securityConfigSecret:
+    #        name: shopware-opensearch-securityconfig
+    tls:
+      http:
+        generate: true
+      transport:
+        generate: true
+        perNode: true
+  dashboards:
+    tls:
+      enable: true
+      generate: true
+    version: 2.18.0
+    enable: true
+    replicas: 1
+    #    env:
+    #      - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    #        value: admin123
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  confMgmt:
+    smartScaler: true
+  nodePools:
+    - component: masters
+      pdb:
+        enable: true
+        minAvailable: 1
+      replicas: 3
+      diskSize: "30Gi"
+      nodeSelector:
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "500m"
+      roles:
+        - "cluster_manager"
+        - "data"
+    - component: nodes
+      replicas: 3
+      diskSize: "30Gi"
+      nodeSelector:
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "500m"
+      roles:
+        - "data"
+    - component: coordinators
+      replicas: 3
+      diskSize: "30Gi"
+      nodeSelector:
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "2Gi"
+          cpu: "500m"
+      roles:
+        - "ingest"

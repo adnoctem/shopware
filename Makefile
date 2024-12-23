@@ -132,12 +132,17 @@ secretGenerator:
     type: "kubernetes.io/tls"
     namespace: cert-manager
     files:
-      - tls.crt=ca.pem
-      - tls.key=ca-key.pem
+      - tls.crt=ssl/ca.pem
+      - tls.key=ssl/ca-key.pem
     options:
       disableNameSuffixHash: true
       annotations:
         reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
+  - name: shopware-env-secrets
+    type: Opaque
+    namespace: shopware
+    envs:
+      - .env.tmp
 endef
 
 # ---------------------------
@@ -421,7 +426,9 @@ mysql-import:
 .PHONY: secrets
 secrets: secrets-dir secrets-gen-ca secrets-gen-server
 	$(call log_notice, "Creating development Kustomization!")
-	$(file > $(SECRETS_TLS_DIR)/kustomization.yaml,$(DEV_KUSTOMIZATION))
+	@cp .env $(SECRETS_DIR)/.env.tmp
+	@echo $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32) > $(SECRETS_DIR)/db_password.txt
+	$(file > $(SECRETS_DIR)/kustomization.yaml,$(DEV_KUSTOMIZATION))
 
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv

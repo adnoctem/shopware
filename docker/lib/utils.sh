@@ -1,5 +1,11 @@
 # shellcheck shell=bash
 
+CWD="$(pwd)"
+
+# Constants
+ROOT="${CWD}"
+SW_TOOL="${ROOT}/bin/console" # use console by default
+
 # deployment-helper - ensure we have some values set
 export INSTALL_LOCALE="${INSTALL_LOCALE:-"en-GB"}"
 export INSTALL_CURRENCY="${INSTALL_CURRENCY:-"EUR"}"
@@ -50,7 +56,7 @@ pc() {
 #######################################
 # Ensure we're in the project root.
 # Globals:
-#   None
+#   ROOT
 # Arguments:
 #   None
 # Returns:

@@ -16,8 +16,6 @@ ctl_usage() {
 	echo
 	echo "Usage: $(basename "${0}") <COMMAND>"
 	echo
-	echo "shell   - Obtain a Shell in the container"
-	echo "sleep   - Sleep forever"
 	echo "init    - Initialize the Shopware instance"
 	echo "start   - Start the supervisord process"
 	echo "run     - Run Shopware (initialize & start)"
@@ -43,22 +41,8 @@ ctl_init() {
 #   'start' function
 # ----------------------
 ctl_start() {
-	log "Starting supervisord..."
-	/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
-}
-
-# ----------------------
-#   'shell' function
-# ----------------------
-ctl_shell() {
-	/bin/sh
-}
-
-# ----------------------
-#   'sleep' function
-# ----------------------
-ctl_sleep() {
-	sleep infinity
+	log "Starting PHP-FPM..."
+	/usr/local/sbin/php-fpm -F
 }
 
 # --------------------------------
@@ -68,14 +52,6 @@ main() {
 	cmd=${1}
 
 	case "${cmd}" in
-	shell)
-		ctl_shell
-		return $?
-		;;
-	sleep)
-		ctl_sleep
-		return $?
-		;;
 	init)
 		ctl_init
 		return $?

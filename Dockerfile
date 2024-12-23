@@ -4,7 +4,10 @@
 # Set the Docker syntax version. Limit features to release from 27-11-2024.
 
 ARG PHP_VERSION=8.3
+ARG NODE_VERSION=22
 
+# lock versions
+FROM node:$NODE_VERSION-alpine AS node
 FROM php:$PHP_VERSION-fpm-alpine AS php-base
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
@@ -37,11 +40,8 @@ ARG EXTRA_PHP_EXTENSIONS="opentelemetry grpc"
 RUN  --mount=type=bind,from=mlocati/php-extension-installer:latest,source=/usr/bin/install-php-extensions,target=/usr/local/bin/install-php-extensions \
     install-php-extensions ${EXTRA_PHP_EXTENSIONS}
 
-ARG PORT=9000
-
 # define core environment variables (php-cli, php-fpm, utils.sh)
-ENV PORT="${PORT}" \
-    DATABASE_TIMEOUT=120 \
+ENV DATABASE_TIMEOUT=120 \
     OPENSEARCH_TIMEOUT=120 \
     REDIS_TIMEOUT=120 \
     PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
@@ -64,7 +64,7 @@ ENV PORT="${PORT}" \
     PHP_REALPATH_CACHE_TTL="4096k" \
     PHP_REALPATH_CACHE_SIZE=3600 \
     PHP_FPM_PM="dynamic" \
-    PHP_FPM_LISTEN="${PORT}" \
+    PHP_FPM_LISTEN="/run/php/php-fpm.sock" \
     PHP_FPM_MAX_CHILDREN=15 \
     PHP_FPM_START_SERVERS=5 \
     PHP_FPM_MIN_SPARE_SERVERS=2 \
@@ -112,15 +112,17 @@ RUN \
     mkdir -p -m 660 /var/www/html /run/php ; \
     chown -R ${PUID}:${PGID} /var/www/html /run/php
 
+# install Node.js at the given version
+COPY --from=node /usr/lib /usr/lib
+COPY --from=node /usr/local/lib /usr/local/lib
+COPY --from=node /usr/local/include /usr/local/include
+COPY --from=node /usr/local/bin /usr/local/bin
+
 # configure Shell and install base dependencies
 RUN apk update && apk add --no-cache \
     bash=~5.2 \
-    supervisor=~4.2 \
     jq=~1.7 \
-    busybox \
     fcgi \
-    nodejs \
-    npm \
     trurl \
     acl \
     shadow
@@ -152,8 +154,13 @@ RUN chsh -s /bin/bash shopware ; \
 #
 # ref: https://github.com/thephpleague/flysystem/issues/1759
 RUN echo -e "\n# DO NOT REMOVE - the AWS SDK requires these\n" >> /etc/profile ; \
-    echo 'export AWS_ACCESS_KEY_ID=$SHOPWARE_S3_ACCESS_KEY' >> /etc/profile ; \
-    echo 'export AWS_SECRET_ACCESS_KEY=$SHOPWARE_S3_SECRET_KEY' >> /etc/profile
+    echo 'export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY' >> /etc/profile ; \
+    echo 'export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY' >> /etc/profile ; \
+    echo -e "\n# Shopware environment variables\n" >> /etc/profile ; \
+    echo 'export DATABASE_URL=mysql://$DATABASE_USER:$DATABASE_PASSWORD@$DATABASE_HOST:$DATABASE_PORT/$DATABASE_NAME' >> /etc/profile ; \
+    echo 'export OPENSEARCH_URL=http://$OPENSEARCH_USER:$OPENSEARCH_PASSWORD@$OPENSEARCH_HOST:$OPENSEARCH_PORT' >> /etc/profile ; \
+    echo 'export REDIS_URL=mysql://$REDIS_USER:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT/$REDIS_DB' >> /etc/profile ; \
+    echo 'export MAILER_DSN=mysql://$SMTP_USER:$SMTP_PASSWORD@$SMTP_HOST:$SMTP_PORT' >> /etc/profile ; \
 
 # add container executables and library scripts
 COPY --chmod=755 docker/bin/swctl /usr/local/bin
@@ -170,9 +177,8 @@ USER ${PUID}:${PGID}
 HEALTHCHECK --start-period=3m --timeout=10s --interval=15s --retries=25 \
    CMD cgi-fcgi -bind -connect ${PHP_FPM_LISTEN} | grep -q "Status" || exit 1
 
-# execute 'swctl' by default + expose 9000
+# execute 'swctl' by default
 ENTRYPOINT ["swctl"]
-EXPOSE ${PORT}
 
 # -------------------------------------
 # Base Shopware configuration

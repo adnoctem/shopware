@@ -25,12 +25,12 @@ variable "REPO" {
 }
 
 # set a default version
-variable "DEFAULT_PHP" {
+variable "PHP" {
   default = "8.3"
 }
 
 variable "PHP_VERSIONS" {
-  default = "8.2,${DEFAULT_PHP}"
+  default = "8.2,${PHP}"
 }
 
 # ==== Custom Functions ====
@@ -93,10 +93,10 @@ function "tags" {
       for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
       flatten([
           tag == "latest" && target == "prod" ? "${REPO}:${tag}" : "",
-          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${REPO}:${tag}${suffix}-${target}" : "",
-          tag != "latest" && suffix == "-fcgi" && target != "prod" ? "${REPO}:${tag}-${target}" : "",
-          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${REPO}:${tag}${suffix}" : "",
-          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${REPO}:${tag}" : "",
+          tag != "latest" && suffix != "-${PHP}" && target != "prod" ? "${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix == "-${PHP}" && target != "prod" ? "${REPO}:${tag}-${target}" : "",
+          tag != "latest" && suffix != "-${PHP}" && target == "prod" ? "${REPO}:${tag}${suffix}" : "",
+          tag != "latest" && suffix == "-${PHP}" && target == "prod" ? "${REPO}:${tag}" : "",
       ])
     ],
     [
@@ -104,10 +104,10 @@ function "tags" {
       for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
       flatten([
           tag == "latest" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
-          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}${suffix}-${target}" : "",
-          tag != "latest" && suffix == "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}-${target}" : "",
-          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}${suffix}" : "",
-          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
+          tag != "latest" && suffix != "-${PHP}" && target != "prod" ? "${rgs}/${REPO}:${tag}${suffix}-${target}" : "",
+          tag != "latest" && suffix == "-${PHP}" && target != "prod" ? "${rgs}/${REPO}:${tag}-${target}" : "",
+          tag != "latest" && suffix != "-${PHP}" && target == "prod" ? "${rgs}/${REPO}:${tag}${suffix}" : "",
+          tag != "latest" && suffix == "-${PHP}" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
       ])
     ]
     ]
@@ -179,7 +179,7 @@ target "shopware-fcgi" {
   }
   target = tgt
   tags = tags(
-    "-fcgi",
+    "-${php}",
     tgt
   )
 }
@@ -195,7 +195,7 @@ target "shopware-nginx" {
   contexts = {
     base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
   }
-  # never update latest for a non-fcgi image
+  # NOTE: never update latest for a non-fcgi image
   tags = setsubtract(tags("-nginx", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
 }
 
@@ -210,7 +210,7 @@ target "shopware-aio" {
   contexts = {
     base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
   }
-  tags = setsubtract(tags("-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
+  tags = setsubtract(tags("-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]) # see note above
 }
 
 # The Nginx AIO (all-in-one) application image
@@ -224,7 +224,7 @@ target "shopware-nginx-aio" {
   contexts = {
     base = join("", ["docker-image://fmjstudios/shopware:", tgt != "dev" ? "${VERSION}-nginx" : "${VERSION}-nginx-dev"])
   }
-  tags = setsubtract(tags("-nginx-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
+  tags = setsubtract(tags("-nginx-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]) # see note above
 }
 
 # NOTE: The image using Caddy as the web server is deprecated, due to the DoS possibility with Caddy's

@@ -4,6 +4,40 @@
 
 - [ ] Add [Shopware Analytics](https://store.shopware.com/en/swag541977532977f/shopware-analytics.html) (possibly via
   Composer) -> not possible in 'dev' mode (requires registered shop)
+- [ ] Add the [HiPages PHP-FPM Exporter](https://github.com/hipages/php-fpm_exporter)
+- [ ] Add the [Nginx Exporter](https://github.com/nginxinc/nginx-prometheus-exporter)
+
+## 📦 Container Changes
+
+- [ ] Add a proper [Banner](http://patorjk.com/software/taag/#p=display&f=Doom&t=FMJ%20Studios%20-%20Shopware%206)
+- [ ] Utilize
+  the [Nginx OTEL Image](https://github.com/nginxinc/docker-nginx/blob/e78cf70ce7b73a0c9ea734c9cf8aaaa283c1cc5a/stable/debian-otel/Dockerfile)
+  and [shared mount](https://tkacz.pro/kubernetes-nginx-and-php-fpm/) for the TCP/Unix socket
+- [ ]
+  Remove [SetUID-bits](https://eng.libretexts.org/Bookshelves/Computer_Science/Operating_Systems/Linux_-_The_Penguin_Marches_On_(McClanahan)/03%3A_Permission_and_Ownership_Management/3.04%3A_Special_Permission_Types_The_setuid_Bit#:~:text=The%20set%20user%20id%20bit,the%20user%20who%20launched%20it.)
+  within the entire container like done
+  line [Bitnami's Containers](https://github.com/bitnami/containers/blob/main/bitnami/redis/7.4/debian-12/Dockerfile#L48)
+- [ ]
+  Introduce [Bitnami-inspired](https://github.com/bitnami/containers/blob/main/bitnami/wordpress/6/debian-12/rootfs/opt/bitnami/scripts/wordpress/entrypoint.sh)
+  `ENTRYPOINT` scripts utilizing `exec` for check process monitoring and separate `<program>-env.sh` scripts to
+  configure the environment variables for each process instead of cluttering the entire container's ENV
+- [ ]
+  Implement [RedHat-recommended conventions](https://developers.redhat.com/articles/2023/03/23/10-tips-writing-secure-maintainable-dockerfiles)
+  also to
+  preserve [OpenShift Compatibility](https://developers.redhat.com/blog/2020/10/26/adapting-docker-and-kubernetes-containers-to-run-on-red-hat-openshift-container-platform#)
+- [ ] Configure PHP-FPM on the fly like done in the [
+  `docker-library/wordpress`](https://github.com/docker-library/wordpress/blob/master/latest/php8.3/fpm-alpine/Dockerfile)
+  image to eliminate the need for repo-stored configuration files
+- [ ] Switch to `Debian` as a more solid base, which is also usable as a `distroless` container and compile extensions
+  without helper scripts or containers like [
+  `docker-library/wordpress`](https://github.com/docker-library/wordpress/blob/master/latest/php8.3/fpm/Dockerfile)
+- [ ] Implement a [`distroless`](https://github.com/s6n-labs/distroless-php/blob/main/Dockerfile) final image layer
+  using `ldd` to minimize the image size (and switch to Debian...)
+- [ ] Expand on
+  the
+  new [Shopware Deployment Helper](https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/deployment-helper.html)
+  functionality and give the process its' own scripts to be run in an `initContainer`
+- [ ] Explore the use of [`slim`](https://github.com/slimtoolkit/slim) for final minification
 
 ## ✏️ Planned Changes
 

@@ -5,6 +5,13 @@ metadata:
   namespace: shopware
   annotations:
     cert-manager.io/cluster-issuer: zerossl-staging-issuer
+  labels:
+    app.kubernetes.io/component: shop
+    app.kubernetes.io/instance: shopware
+    app.kubernetes.io/managed-by: Kustomize
+    app.kubernetes.io/name: shopware
+    app.kubernetes.io/part-of: shopware
+    app.kubernetes.io/version: 0.3.0
 spec:
   ingressClassName: nginx
   rules:
@@ -16,5 +23,4 @@ spec:
               service:
                 name: shopware
                 port:
-                  name: http
                   number: 9000

@@ -148,7 +148,7 @@ releases:
   - chart: percona/pxc-operator
     name: pxc-operator
     namespace: pxc-operator
-    version: 1.15.1
+    version: 1.16.0
     installed: true
     disableValidationOnInstall: true
     labels:
@@ -158,3 +158,13 @@ releases:
       - kube-prometheus-stack/kube-prometheus-stack
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/pxc-operator.yaml
+
+  - chart: bitnami/redis
+    name: shopware-redis
+    labels:
+      release: shopware
+    namespace: shopware
+    version: 20.6.0
+    installed: true
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/shopware-redis.yaml
