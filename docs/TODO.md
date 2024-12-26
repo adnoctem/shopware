@@ -83,3 +83,22 @@
 <!-- General links -->
 
 [github_service_containers]: https://docs.github.com/en/actions/use-cases-and-examples/using-containerized-services/creating-postgresql-service-containers
+
+```yaml
+env:
+  current: dev
+  envs:
+    - dev
+    - stage
+    - prod
+
+...
+
+charts:
+  values:
+    - values.yaml
+    #- values.dev.yaml
+    - extra-dir/values.yaml
+    #- extra-dir/values.dev.yaml
+    #- dev/values.yaml
+```
