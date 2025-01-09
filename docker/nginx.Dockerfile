@@ -21,12 +21,18 @@ USER root
 # install base dependencies
 RUN apk add --no-cache \
     nginx=~1.26 \
-    envsubst
+    envsubst \
+    supervisor
 
 # configuration
-RUN rm -rf /etc/nginx/http.d/*.conf
+RUN \
+    rm -rf /etc/nginx/http.d/*.conf ; \
+    mkdir -p -m 755 /var/log/supervisor ; \
+    chown -R ${PUID}:${PGID} /var/www/html /var/log/supervisor /run/php
+
 COPY --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
 COPY --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
+COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 COPY --chmod=644 docker/conf/supervisor/nginx-supervisor.conf /etc/supervisor/conf.d/nginx.conf
 
 # override FPM TCP listener to use a local socket

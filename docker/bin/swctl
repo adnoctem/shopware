@@ -41,8 +41,8 @@ ctl_init() {
 #   'start' function
 # ----------------------
 ctl_start() {
-	log "Starting PHP-FPM..."
-	/usr/local/sbin/php-fpm -F
+	log "Starting Supervisor..."
+	exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 }
 
 # --------------------------------

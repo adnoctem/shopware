@@ -107,9 +107,9 @@ ARG PGID=1001
 # create (unprivileged) shopware user and create/own required directories
 # NOTE: logs should be redirected to std streams
 RUN \
-    addgroup -g ${PGID} -S ${USER}; \
-	adduser -D ${USER} -G ${USER} -u ${PUID} ; \
-    mkdir -p -m 660 /var/www/html /run/php ; \
+    addgroup -g ${PGID} -S ${USER} ; \
+	  adduser -D ${USER} -G ${USER} -u ${PUID} ; \
+    mkdir -p -m 755 /var/www/html /run/php ; \
     chown -R ${PUID}:${PGID} /var/www/html /run/php
 
 # install Node.js at the given version
@@ -155,12 +155,12 @@ RUN chsh -s /bin/bash shopware ; \
 # ref: https://github.com/thephpleague/flysystem/issues/1759
 RUN echo -e "\n# DO NOT REMOVE - the AWS SDK requires these\n" >> /etc/profile ; \
     echo 'export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY' >> /etc/profile ; \
-    echo 'export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY' >> /etc/profile ; \
-    echo -e "\n# Shopware environment variables\n" >> /etc/profile ; \
-    echo 'export DATABASE_URL=mysql://$DATABASE_USER:$DATABASE_PASSWORD@$DATABASE_HOST:$DATABASE_PORT/$DATABASE_NAME' >> /etc/profile ; \
-    echo 'export OPENSEARCH_URL=http://$OPENSEARCH_USER:$OPENSEARCH_PASSWORD@$OPENSEARCH_HOST:$OPENSEARCH_PORT' >> /etc/profile ; \
-    echo 'export REDIS_URL=mysql://$REDIS_USER:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT/$REDIS_DB' >> /etc/profile ; \
-    echo 'export MAILER_DSN=mysql://$SMTP_USER:$SMTP_PASSWORD@$SMTP_HOST:$SMTP_PORT' >> /etc/profile ; \
+    echo 'export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY' >> /etc/profile
+    # echo -e "\n# Shopware environment variables\n" >> /etc/profile ; \
+    # echo 'export DATABASE_URL=mysql://$DATABASE_USER:$DATABASE_PASSWORD@$DATABASE_HOST:$DATABASE_PORT/$DATABASE_NAME' >> /etc/profile ; \
+    # echo 'export OPENSEARCH_URL=http://$OPENSEARCH_USER:$OPENSEARCH_PASSWORD@$OPENSEARCH_HOST:$OPENSEARCH_PORT' >> /etc/profile ; \
+    # echo 'export REDIS_URL=mysql://$REDIS_USER:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT/$REDIS_DB' >> /etc/profile ; \
+    # echo 'export MAILER_DSN=mysql://$SMTP_USER:$SMTP_PASSWORD@$SMTP_HOST:$SMTP_PORT' >> /etc/profile
 
 # add container executables and library scripts
 COPY --chmod=755 docker/bin/swctl /usr/local/bin
