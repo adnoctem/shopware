@@ -455,7 +455,7 @@ endif
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
 .PHONY: secrets-gen-ca
 secrets-gen-ca:
-ifeq ($(shell test -e $(SECRETS_TLS_DIR)/ca.pem && echo -n yes ), yes)
+ifeq ($(shell test -e $(SECRETS_TLS_DIR)/ca.pem && echo -n yes), yes)
 	$(call log_attention, "Skipping generation of root certificate authority. Files exist!")
 else
 	$(call log_notice, "Generating root certificate authority at: $(SECRETS_DIR)")
@@ -467,7 +467,7 @@ endif
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
 .PHONY: secrets-gen-server
 secrets-gen-server:
-ifeq ($(shell test -e $(SECRETS_TLS_DIR)/server.pem && echo -n yes ), yes)
+ifeq ($(shell test -e $(SECRETS_TLS_DIR)/server.pem && echo -n yes), yes)
 	$(call log_attention, "Skipping generation of server TLS certificate. Files exist!")
 else
 	$(call log_notice, "Generating server TLS certificate at: $(SECRETS_DIR)")

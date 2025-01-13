@@ -34,6 +34,7 @@ COPY --chmod=644 docker/conf/nginx/nginx.conf /etc/nginx
 COPY --chmod=644 docker/conf/nginx/shopware-http.conf /etc/nginx/http.d/shopware.conf
 COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 COPY --chmod=644 docker/conf/supervisor/nginx-supervisor.conf /etc/supervisor/conf.d/nginx.conf
+COPY --chmod=644 docker/conf/supervisor/workers-supervisor.conf /etc/supervisor/conf.d/workers.conf
 
 # override FPM TCP listener to use a local socket
 ENV PORT=${PORT:-8000} \
