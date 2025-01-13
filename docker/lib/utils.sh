@@ -1,10 +1,13 @@
 # shellcheck shell=bash
 
-CWD="$(pwd)"
-
 # Constants
-ROOT="${CWD}"
-SW_TOOL="${ROOT}/bin/console" # use console by default
+DOCROOT="$(pwd)"
+SW_TOOL="${DOCROOT}/bin/console" # use console by default
+STOREFRONT_LOCATIONS=(
+	  'config/packages/storefront.yaml'
+	  'config/packages/prod/storefront.yaml'
+	  'config/packages/dev/storefront.yaml'
+)
 
 # deployment-helper - ensure we have some values set
 export INSTALL_LOCALE="${INSTALL_LOCALE:-"en-GB"}"
@@ -12,7 +15,7 @@ export INSTALL_CURRENCY="${INSTALL_CURRENCY:-"EUR"}"
 export INSTALL_ADMIN_USERNAME="${INSTALL_ADMIN_USERNAME:-"admin"}"
 export INSTALL_ADMIN_PASSWORD="${INSTALL_ADMIN_PASSWORD:-"shopware"}"
 export SALES_CHANNEL_URL="${APP_URL:-"shopware.internal"}"
-
+export SALES_CHANNEL_THEME="${SALES_CHANNEL_THEME:-"Storefront"}"
 #######################################
 # Log a line with the date and file.
 # Globals:
@@ -25,6 +28,23 @@ export SALES_CHANNEL_URL="${APP_URL:-"shopware.internal"}"
 #######################################
 log() {
 	echo "[$(date '+%d-%m-%Y_%T')] $(basename "${0}"): ${*}"
+}
+
+#######################################
+# Ensure we're in the project root.
+# Globals:
+#   DOCROOT
+# Arguments:
+#   None
+# Returns:
+#   0 if we are, 1 otherwise.
+#######################################
+ensure_project_root() {
+	# check if current dir
+	if [ ! -e "${DOCROOT}/composer.json" ]; then
+		log "ERROR: script is not being executed from project root!"
+		exit 1
+	fi
 }
 
 #######################################
@@ -51,25 +71,6 @@ pc() {
 	fi
 
 	php -derror_reporting=E_ALL "${SW_TOOL}" "$@"
-}
-
-#######################################
-# Ensure we're in the project root.
-# Globals:
-#   ROOT
-# Arguments:
-#   None
-# Returns:
-#   0 if we are, 1 otherwise.
-#######################################
-ensure_project_root() {
-	# check if current dir
-	if [ ! -e "${ROOT}/composer.json" ]; then
-		log "ERROR: script is not being executed from project root!"
-		return 1
-	fi
-
-	return 0
 }
 
 #######################################
@@ -196,4 +197,55 @@ deployment_helper() {
 	else
 		log "Shopware Deployment-Helper executed successfully!"
 	fi
+}
+
+#######################################
+# Comment or uncomment storefront.yaml for
+#   first deployments...
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Logs remaining seconds on each iteration.
+#######################################
+install_or_setup() {
+  ensure_project_root
+  if ! "${SW_TOOL}" system:is-installed; then
+    log "Shopware 6 was not found to be installed. Installing Shopware..."
+    comment_storefront_config
+    deployment_helper
+    # re-initialize to fix frontend bug
+    sales_channel_id=$(pc sales-channel:list --output json | jq -r '[.[] | {(.name|tostring): .id }] | add' | jq -r ".$SALES_CHANNEL_THEME")
+    pc -n theme:change -s "$sales_channel_id" "$SALES_CHANNEL_THEME" --sync
+    pc -n cache:clear
+    uncomment_storefront_config
+  else
+    log "Shopware 6 is installed. Updating..."
+    deployment_helper
+  fi
+}
+
+comment_storefront_config() {
+  ensure_project_root
+  log "Commenting Storefront configuration..."
+	for location in "${STOREFRONT_LOCATIONS[@]}"; do
+	    if [[ -e ${location} ]]; then
+        log "Found configuration file: ${location} - commenting ..."
+        # preserve comments
+        sed -i -e 1,4b -e 's/^/# /' "${location}"
+	    fi
+	done
+}
+
+uncomment_storefront_config() {
+  ensure_project_root
+  log "Uncommenting Storefront configuration..."
+	for location in "${STOREFRONT_LOCATIONS[@]}"; do
+	    if [[ -e ${location} ]]; then
+        echo "Found configuration file: ${location} - uncommenting ..."
+        # preserve comments
+        sed -i -e 1,4b -e 's/^# //' "${location}"
+	    fi
+	done
 }

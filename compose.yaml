@@ -29,9 +29,13 @@ services:
       - no-new-privileges:true
 
   shopware:
-    image: fmjstudios/shopware:0.1.1-nginx
+    image: fmjstudios/shopware:0.6.0-nginx
     container_name: shopware
     env_file: .env
+    #    entrypoint:
+    #      - /bin/bash
+    #      - -c
+    #      - sleep 86400
     #    build:
     #      context: .
     #      dockerfile: docker/nginx.Dockerfile
@@ -417,7 +421,7 @@ services:
 
   # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.110.0
+    image: otel/opentelemetry-collector:0.117.0
     container_name: otel-collector
     restart: always
     command: [ "--config=/etc/otel-collector.yaml" ]
@@ -439,19 +443,19 @@ services:
 
 configs:
   traefik.yml:
-    file: docker/resources/traefik.yml
+    file: deploy/conf/traefik.yml
   traefik-dynamic.yml:
-    file: docker/resources/traefik-dynamic.yml
+    file: deploy/conf/traefik-dynamic.yml
   grafana-datasources.yaml:
-    file: docker/resources/grafana-datasources.yaml
+    file: deploy/conf/grafana-datasources.yaml
   tempo.yaml:
-    file: docker/resources/tempo.yaml
+    file: deploy/conf/tempo.yaml
   prometheus.yaml:
-    file: docker/resources/prometheus.yaml
+    file: deploy/conf/prometheus.yaml
   otel-collector-config.yaml:
-    file: docker/resources/otel-collector-config.yaml
+    file: deploy/conf/otel-collector-config.yaml
   my.cnf:
-    file: docker/resources/my.cnf
+    file: deploy/conf/my.cnf
 
 # cannot be created inline reliably, because they produce a mount error with Docker Desktop + WSL2
 # ERROR: response from daemon: path /.../home/fmj/Software/Code/FMJStudios/shopware/secrets/ssl/server.pem is mounted on / but it is not a shared mount.

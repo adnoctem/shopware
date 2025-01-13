@@ -30,12 +30,23 @@ spec:
       serviceAccountName: shopware
       terminationGracePeriodSeconds: 400
       containers:
-        - name: shopware
-          image: fmjstudios/shopware:0.3.1-nginx
+        - name: nginx
+          image: nginx:1.27
           imagePullPolicy: IfNotPresent
-          #          command:
-          #            - sleep
-          #            - infinity
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /run/php
+              name: php-fpm-socket
+            - mountPath: /etc/nginx/nginx.conf
+              name: nginx-config
+            - mountPath: /etc/nginx/conf.d/shopware.conf
+              name: nginx-shopware-config
+        - name: shopware
+          image: fmjstudios/shopware:0.3.5
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
               name: http
@@ -43,6 +54,9 @@ spec:
           envFrom:
             - secretRef:
                 name: shopware-env-secrets
+          volumeMounts:
+            - mountPath: /run/php
+              name: php-fpm-socket
           #      initContainers:
           #        - name: message-workers
           #          image: ghcr.io/fmjstudios/shopware:0.2.0-nginx
@@ -94,3 +108,12 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
+      volumes:
+        - name: php-fpm-socket
+          emptyDir: { }
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+        - name: nginx-shopware-config
+          configMap:
+            name: nginx-shopware-config

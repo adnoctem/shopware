@@ -355,7 +355,6 @@ endef
 start:
 	$(call log_notice, "Starting Shopware on local Symfony development server!")
 	@$(docker) compose --file docker/compose-base.yaml up -d
-	@$(composer) run deployment-helper
 	@symfony server:start -d --no-tls --allow-http
 	@symfony server:log
 

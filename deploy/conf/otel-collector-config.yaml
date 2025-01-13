@@ -6,7 +6,7 @@ receivers:
 
 exporters:
   otlp:
-    endpoint: "tempo:4317"
+    endpoint: tempo:4317
     tls:
       insecure: true
 
@@ -20,8 +20,8 @@ exporters:
 service:
   pipelines:
     traces:
-      receivers: [otlp]
-      exporters: [otlp]
+      receivers: [ otlp ]
+      exporters: [ otlp ]
 #    metrics:
 #      receivers: [ otlp ]
 #      processors: [ batch ]
