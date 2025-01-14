@@ -1,4 +1,4 @@
-# Copyright (C) [2024] The FMJ Studios Shopware 6 Authors
+# Copyright (C) [2024] Ad Noctem Collective
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -129,20 +129,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 secretGenerator:
   - name: root-ca
-    type: "kubernetes.io/tls"
-    namespace: cert-manager
-    files:
-      - tls.crt=ssl/ca.pem
-      - tls.key=ssl/ca-key.pem
-    options:
-      disableNameSuffixHash: true
-      annotations:
-        reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
+	type: "kubernetes.io/tls"
+	namespace: cert-manager
+	files:
+	  - tls.crt=ssl/ca.pem
+	  - tls.key=ssl/ca-key.pem
+	options:
+	  disableNameSuffixHash: true
+	  annotations:
+		reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
   - name: shopware-env-secrets
-    type: Opaque
-    namespace: shopware
-    envs:
-      - .env.tmp
+	type: Opaque
+	namespace: shopware
+	envs:
+	  - .env.tmp
 endef
 
 # ---------------------------
@@ -286,8 +286,8 @@ image:
 	$(call log_notice, "Building Docker image $(NAME):$(TAG)!")
 	-$(docker) buildx build -t $(NAME):$(TAG) -t $(NAME):latest \
 		--network host \
- 		--target $(ENV) \
-	 	--build-arg PHP_VERSION=$(PHP_VERSION) .
+		--target $(ENV) \
+		--build-arg PHP_VERSION=$(PHP_VERSION) .
 endif
 
 define BAKE_INFO
@@ -301,7 +301,10 @@ bake:
 else
 bake:
 	$(call log_notice, "Baking Docker images for target: $(TARGET)!")
+ifneq (,$(wildcard .env))
 	export $(shell grep -v '^#' .env | xargs)
+	export
+endif
 	export VERSION=$(TAG)
 	@$(docker) buildx bake --file $(BAKE_CONFIG) $(TARGET) --builder default $(BAKE_ARGS)
 endif
@@ -423,7 +426,7 @@ mysql-import:
 # ---------------------------
 
 .PHONY: secrets
-secrets: secrets-dir secrets-gen-ca secrets-gen-server
+secrets: secrets-dir secrets-auth secrets-gen-ca secrets-gen-server
 	$(call log_notice, "Creating development Kustomization!")
 	@cp .env $(SECRETS_DIR)/.env.tmp
 	@echo $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32) > $(SECRETS_DIR)/db_password.txt
@@ -450,6 +453,17 @@ else
 	@sed -i -e "s/SHOPWARE_S3_SECRET_KEY=CHANGEME/SHOPWARE_S3_SECRET_KEY=$(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 64)/g" .env
 endif
 
+# Generate the Composer auth.json for private Composer repositories
+# NOTE: not working!!
+.PHONY: secrets-auth
+secrets-auth:
+ifneq ($(wildcard ./.env),)
+	$(call log_notice, "Creating Composer's auth.json!")
+	include .env
+	composer config bearer.packages.shopware.com $(SHOPWARE_PACKAGES_TOKEN)
+else
+	$(call log_attention, ".env file does not exist. Cannot create auth.json!")
+endif
 
 # Generate the TLS CA certificate to create and sign server certificates for Traefik
 # ref: https://github.com/coreos/docs/blob/master/os/generate-self-signed-certificates.md
@@ -460,7 +474,7 @@ ifeq ($(shell test -e $(SECRETS_TLS_DIR)/ca.pem && echo -n yes), yes)
 else
 	$(call log_notice, "Generating root certificate authority at: $(SECRETS_DIR)")
 	@cd $(SECRETS_TLS_DIR) && \
-    	cfssl genkey -initca $(CONFIG_TLS_DIR)/ca-csr.json | cfssljson -bare ca
+		cfssl genkey -initca $(CONFIG_TLS_DIR)/ca-csr.json | cfssljson -bare ca
 endif
 
 # Generate the TLS server certificates for Traefik to use
@@ -472,9 +486,9 @@ ifeq ($(shell test -e $(SECRETS_TLS_DIR)/server.pem && echo -n yes), yes)
 else
 	$(call log_notice, "Generating server TLS certificate at: $(SECRETS_DIR)")
 	@cd $(SECRETS_TLS_DIR) && \
-    	cfssl gencert -ca=$(SECRETS_TLS_DIR)/ca.pem -ca-key=$(SECRETS_TLS_DIR)/ca-key.pem \
-    	-config=$(CONFIG_TLS_DIR)/ca-config.json -profile=server $(CONFIG_TLS_DIR)/server-csr.json \
-    	 | cfssljson -bare server
+		cfssl gencert -ca=$(SECRETS_TLS_DIR)/ca.pem -ca-key=$(SECRETS_TLS_DIR)/ca-key.pem \
+		-config=$(CONFIG_TLS_DIR)/ca-config.json -profile=server $(CONFIG_TLS_DIR)/server-csr.json \
+		 | cfssljson -bare server
 endif
 
 # ---------------------------

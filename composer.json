@@ -1,6 +1,6 @@
 {
-  "name": "fmjstudios/shopware",
-  "description": "The FMJ Studios build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3.",
+  "name": "adnoctem/shopware",
+  "description": "The Ad Noctem build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3",
   "license": "MIT",
   "type": "project",
   "require": {
@@ -22,29 +22,33 @@
     "swag/paypal": "^9.6",
     "symfony/flex": "^2.4"
   },
-  "repositories": [
-    {
+  "repositories": {
+    "shopware-packages": {
+      "type": "composer",
+      "url": "https://packages.shopware.com"
+    },
+    "plugins": {
       "type": "path",
       "url": "custom/plugins/*",
       "options": {
         "symlink": true
       }
     },
-    {
+    "plugins-packages": {
       "type": "path",
       "url": "custom/plugins/*/packages/*",
       "options": {
         "symlink": true
       }
     },
-    {
+    "static-plugins": {
       "type": "path",
       "url": "custom/static-plugins/*",
       "options": {
         "symlink": true
       }
     }
-  ],
+  },
   "minimum-stability": "stable",
   "prefer-stable": true,
   "config": {
