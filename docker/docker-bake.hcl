@@ -59,16 +59,16 @@ function "get_target" {
 function "labels" {
   params = []
   result = {
-    "org.opencontainers.image.base.name"     = "fmjstudios/shopware:latest"
+    "org.opencontainers.image.base.name"     = "adnoctem/shopware:latest"
     "org.opencontainers.image.created"       = "${timestamp()}"
-    "org.opencontainers.image.description"   = "Shopware - packaged by FMJ Studios"
-    "org.opencontainers.image.documentation" = "https://github.com/fmjstudios/shopware"
+    "org.opencontainers.image.description"   = "Shopware - packaged by Ad Noctem Collective"
+    "org.opencontainers.image.documentation" = "https://github.com/adnoctem/shopware"
     "org.opencontainers.image.licenses"      = "MIT"
-    "org.opencontainers.image.url"           = "https://hub.docker.com/r/fmjstudios/shopware"
-    "org.opencontainers.image.source"        = "https://github.com/fmjstudios/shopware"
+    "org.opencontainers.image.url"           = "https://hub.docker.com/r/adnoctem/shopware"
+    "org.opencontainers.image.source"        = "https://github.com/adnoctem/shopware"
     "org.opencontainers.image.title"         = "shopware"
-    "org.opencontainers.image.vendor"        = "FMJ Studios"
-    "org.opencontainers.image.authors"       = "info@fmj.studio"
+    "org.opencontainers.image.vendor"        = "Ad Noctem Collective"
+    "org.opencontainers.image.authors"       = "info@adnoctem.co"
     "org.opencontainers.image.version"       = VERSION == null ? "dev-${timestamp()}" : VERSION
   }
 }

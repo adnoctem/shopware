@@ -68,6 +68,12 @@ GIT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1) 
 VERSION := $(strip $(if $(filter-out "fatal: No names found.*", $(GIT_VERSION)), $(shell echo $(GIT_VERSION)), $(shell echo 0.1.0)))
 NAME := $(shell jq -r '.name' $(ROOT_DIR)/composer.json)
 
+# import .env configuration (if exists)
+ifneq (,$(wildcard ./.env))
+	include .env
+	export
+endif
+
 # executables
 docker := docker
 php := php # at least version 8.2
@@ -301,13 +307,8 @@ bake:
 else
 bake:
 	$(call log_notice, "Baking Docker images for target: $(TARGET)!")
-ifneq (,$(wildcard .env))
-	export $(shell grep -v '^#' .env | xargs)
-	export
-endif
 	export VERSION=$(TAG)
 	@$(docker) buildx bake --file $(BAKE_CONFIG) $(TARGET) --builder default $(BAKE_ARGS)
-endif
 
 define BUNDLE_INFO
 # Build a Tarball bundle of the project's sources.
@@ -385,10 +386,7 @@ stop:
 .PHONY: deps
 deps:
 	$(call log_notice, "Installing project Composer dependencies")
-	@composer install --no-interaction \
-		--ignore-platform-req=ext-opentelemetry \
-		--ignore-platform-req=ext-grpc \
-		--ignore-platform-req=php
+	@composer install --no-interaction --ignore-platform-reqs
 
 #.PHONY: pre-commit
 #pre-commit:
@@ -454,13 +452,11 @@ else
 endif
 
 # Generate the Composer auth.json for private Composer repositories
-# NOTE: not working!!
 .PHONY: secrets-auth
 secrets-auth:
-ifneq ($(wildcard ./.env),)
-	$(call log_notice, "Creating Composer's auth.json!")
-	include .env
-	composer config bearer.packages.shopware.com $(SHOPWARE_PACKAGES_TOKEN)
+ifneq (,$(wildcard ./.env))
+	$(call log_notice, "Creating Composer\'s auth.json!")
+	composer config "bearer.packages.shopware.com" $(SHOPWARE_PACKAGES_TOKEN)
 else
 	$(call log_attention, ".env file does not exist. Cannot create auth.json!")
 endif

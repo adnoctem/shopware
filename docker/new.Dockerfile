@@ -3,31 +3,37 @@
 # ref: https://docs.docker.com/build/buildkit/dockerfile-release-notes/
 # Set the Docker syntax version. Limit features to release from 27-11-2024.
 
+# NOTE: large parts of this code are inspired by (or taken) from the official Docker Inc. Wordpress image
+# ref: https://github.com/docker-library/wordpress
+
 ARG PHP_VERSION=8.3
-ARG NODE_VERSION=22
+ARG NODE_VERSION=20
 
 FROM node:$NODE_VERSION-bookworm AS node
 FROM php:$PHP_VERSION-fpm AS builder
 
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+#ENV MAKEFLAGS="-j $(nproc)" \
+#    COMPOSER_HOME="/tmp/composer"
 
-# persistent dependencies
+# build dependencies
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-# jq is required for our Shopware shell utilities
-		jq \
-        libfcgi-bin \
+		xq \
+    jq \
+    libfcgi-bin \
+    git \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
 # manual install of 'trurl'
 RUN set -eux; \
     apt-get update; \
-	apt-get install -y --no-install-recommends \
+	  apt-get install -y --no-install-recommends \
     # Require to build 'trurl'
 		libcurl4-openssl-dev \
-	; \
+    ; \
     # manual build
     old_wd=$(pwd) ; \
     cd /tmp ; \
@@ -37,7 +43,7 @@ RUN set -eux; \
     make && make install ; \
     cd "$old_wd" && rm -rf /tmp/trurl*; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ; \
-	rm -rf /var/lib/apt/lists/*
+	  rm -rf /var/lib/apt/lists/*
 
 # install PHP \
 # install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
@@ -47,6 +53,10 @@ RUN set -ex; \
 	\
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
+    build-essential \
+    autoconf \
+    libtool \
+    pkg-config \
 		libavif-dev \
 		libfreetype6-dev \
 		libicu-dev \
@@ -54,10 +64,10 @@ RUN set -ex; \
 		libpng-dev \
 		libwebp-dev \
 		libzip-dev \
-        libbz2-dev \
-        libsodium-dev \
-        libzstd-dev \
-        zlib1g-dev \
+    libbz2-dev \
+    libsodium-dev \
+    libzstd-dev \
+    zlib1g-dev \
 	; \
 	\
 	docker-php-ext-configure gd \
@@ -78,6 +88,21 @@ RUN set -ex; \
         bz2 \
         sodium \
 	; \
+  # https://pecl.php.net/package/gRPC
+  # PECL takes up to 30 minutes to install gRPC, therefore we're compiling it ourself
+  # inspired by: https://github.com/grpc/grpc/issues/34278#issuecomment-1871059454
+  # see gRPC README: https://github.com/grpc/grpc/tree/master/src/php
+#    old_wd=$(pwd) ; \
+#    grpc_latest_stable=$(curl -s https://pecl.php.net/rest/r/grpc/allreleases.xml | xq -x '/a/r' | grep -e "\.*stable" | head -n 1); \
+#    grpc_version=${grpc_latest_stable%stable} ;\
+#    git clone --depth 1 -b "v${grpc_version}" https://github.com/grpc/grpc /tmp/grpc ; \
+#    cd /tmp/grpc && git submodule update --init ; \
+#    EXTRA_DEFINES=GRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK make ; \
+#    cd src/php/ext/grpc ; \
+#    phpize && GRPC_LIB_SUBDIR=libs/opt ./configure --enable-grpc="/tmp/grpc" ; \
+#    make && make install ; \
+#    cd "$old_wd" && rm -rf /tmp/grpc ; \
+#    docker-php-ext-enable grpc ; \
     \
 # install community extensions
     EXTENSIONS=( \
@@ -87,7 +112,7 @@ RUN set -ex; \
       "opentelemetry" \
     ) ; \
     for EXT in "${EXTENSIONS[@]}"; do \
-        pecl install --onlyreqdeps --force "${EXT}" ; \
+        MAKEFLAGS="-j $(nproc)" pecl install --onlyreqdeps --force "${EXT}" ; \
         docker-php-ext-enable "${EXT}" ; \
     done ; \
     rm -rf /tmp/pear ; \
@@ -127,11 +152,8 @@ RUN set -ex; \
 	err="$(php --version 3>&1 1>&2 2>&3)"; \
 	[ -z "$err" ]; \
     \
-# strip built shared-objects
-    for SO in "$extDir"/*.so; do \
-        strip --strip-debug "$SO"; \
-    done
-
+# strip built shared-objects to decrease size
+    find "$extDir" -name '*.so' -type f -exec strip --strip-all {} \;
 
 # configure PHP and cleanup obsolete files
 RUN set -eux; \
@@ -144,29 +166,29 @@ RUN set -eux; \
 RUN set -eux; \
 	{ \
 		echo 'expose_php=Off'; \
-        echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
-        echo 'display_errors=Off'; \
-        echo 'display_startup_errors=Off'; \
+    echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
+    echo 'display_errors=Off'; \
+    echo 'display_startup_errors=Off'; \
 		echo 'log_errors = On'; \
 		echo 'error_log = /dev/stderr'; \
 		echo 'log_errors_max_len = 1024'; \
 		echo 'ignore_repeated_errors = On'; \
 		echo 'ignore_repeated_source = Off'; \
-        echo 'html_errors = Off'; \
-        echo 'upload_max_filesize=32M'; \
-        echo 'post_max_size=32M'; \
-        echo 'max_execution_time=120'; \
-        echo 'memory_limit=512M'; \
+    echo 'html_errors = Off'; \
+    echo 'upload_max_filesize=32M'; \
+    echo 'post_max_size=32M'; \
+    echo 'max_execution_time=120'; \
+    echo 'memory_limit=512M'; \
 	} > /usr/local/etc/php/conf.d/general.ini
 
 # set recommended session PHP.ini settings
 RUN set -eux; \
 	{ \
 		echo 'session.cookie_lifetime=0'; \
-        echo 'session.save_handler=files'; \
-        echo 'session.save_path='; \
-        echo 'session.gc_probability=0'; \
-        echo 'session.gc_maxlifetime=1440'; \
+    echo 'session.save_handler=files'; \
+    echo 'session.save_path='; \
+    echo 'session.gc_probability=0'; \
+    echo 'session.gc_maxlifetime=1440'; \
 	} > /usr/local/etc/php/conf.d/session.ini
 
 # set recommended OPCache PHP.ini settings
@@ -174,16 +196,16 @@ RUN set -eux; \
 RUN set -eux; \
 	{ \
 		echo 'opcache.enable_cli=0'; \
-        echo 'opcache.enable_file_override=1'; \
-        echo 'opcache.validate_timestamps=0'; \
-        echo 'opcache.interned_strings_buffer=20'; \
-        echo 'opcache.file_cache='; \
-        echo 'opcache.file_cache_only=0'; \
-        echo 'opcache.memory_consumption=128'; \
+    echo 'opcache.enable_file_override=1'; \
+    echo 'opcache.validate_timestamps=0'; \
+    echo 'opcache.interned_strings_buffer=20'; \
+    echo 'opcache.file_cache='; \
+    echo 'opcache.file_cache_only=0'; \
+    echo 'opcache.memory_consumption=128'; \
 		echo 'opcache.max_accelerated_files=10000'; \
 		echo 'opcache.revalidate_freq=2'; \
-        echo 'zend.assertions=-1'; \
-        echo 'zend.detect_unicode=0'; \
+    echo 'zend.assertions=-1'; \
+    echo 'zend.detect_unicode=0'; \
 	} > /usr/local/etc/php/conf.d/opcache.ini
 
 # set recommended realpath PHP.ini settings
@@ -197,29 +219,29 @@ RUN set -eux; \
 RUN set -eux; \
 	{ \
 		echo '[global]'; \
-        echo 'daemonize=no'; \
-        echo 'error_log=/proc/self/fd/2'; \
-      # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
-        echo 'log_limit = 8192'; \
-        echo '[www]'; \
-        echo 'listen=/run/php/php-fpm.sock'; \
-        echo 'listen.mode=0660'; \
-        echo 'pm=dynamic'; \
-        echo 'pm.max_children=15'; \
-        echo 'pm.start_servers=5'; \
-        echo 'pm.min_spare_servers=2'; \
-        echo 'pm.max_spare_servers=5'; \
-        echo 'pm.max_spawn_rate=2'; \
-        echo 'pm.process_idle_timeout=10s'; \
-        echo 'pm.max_requests=0'; \
-        echo 'pm.status_path=/-/fpm/status'; \
-        echo 'ping.path=/-/fpm/ping'; \
-        echo 'access.log=/dev/null'; \
-        echo 'rlimit_files=8192'; \
-        echo 'catch_workers_output=yes'; \
-        echo 'decorate_workers_output=no'; \
-        echo 'clear_env=no'; \
-        echo 'php_admin_flag[log_errors]=on'; \
+    echo 'daemonize=no'; \
+    echo 'error_log=/proc/self/fd/2'; \
+  # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
+    echo 'log_limit = 8192'; \
+    echo '[www]'; \
+    echo 'listen=/run/php/php-fpm.sock'; \
+    echo 'listen.mode=0660'; \
+    echo 'pm=dynamic'; \
+    echo 'pm.max_children=15'; \
+    echo 'pm.start_servers=5'; \
+    echo 'pm.min_spare_servers=2'; \
+    echo 'pm.max_spare_servers=5'; \
+    echo 'pm.max_spawn_rate=2'; \
+    echo 'pm.process_idle_timeout=10s'; \
+    echo 'pm.max_requests=0'; \
+    echo 'pm.status_path=/-/fpm/status'; \
+    echo 'ping.path=/-/fpm/ping'; \
+    echo 'access.log=/dev/null'; \
+    echo 'rlimit_files=8192'; \
+    echo 'catch_workers_output=yes'; \
+    echo 'decorate_workers_output=no'; \
+    echo 'clear_env=no'; \
+    echo 'php_admin_flag[log_errors]=on'; \
 	} > /usr/local/etc/php-fpm.d/docker.conf
 
 # install composer
@@ -231,8 +253,6 @@ RUN set -eux; \
     php -r "unlink('composer-setup.php');"; \
     mv composer.phar /usr/local/bin/composer
 
-# install Node.js at the given version
-COPY --from=node /usr/lib /usr/lib
+# install Node.js and NPM at the given version
 COPY --from=node /usr/local/lib /usr/local/lib
-COPY --from=node /usr/local/include /usr/local/include
 COPY --from=node /usr/local/bin /usr/local/bin
