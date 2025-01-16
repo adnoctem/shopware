@@ -71,7 +71,6 @@ NAME := $(shell jq -r '.name' $(ROOT_DIR)/composer.json)
 # import .env configuration (if exists)
 ifneq (,$(wildcard ./.env))
 	include .env
-	export
 endif
 
 # executables
@@ -309,6 +308,7 @@ bake:
 	$(call log_notice, "Baking Docker images for target: $(TARGET)!")
 	export VERSION=$(TAG)
 	@$(docker) buildx bake --file $(BAKE_CONFIG) $(TARGET) --builder default $(BAKE_ARGS)
+endif
 
 define BUNDLE_INFO
 # Build a Tarball bundle of the project's sources.
@@ -456,7 +456,7 @@ endif
 secrets-auth:
 ifneq (,$(wildcard ./.env))
 	$(call log_notice, "Creating Composer\'s auth.json!")
-	composer config "bearer.packages.shopware.com" $(SHOPWARE_PACKAGES_TOKEN)
+	@composer config "bearer.packages.shopware.com" $(SHOPWARE_PACKAGES_TOKEN)
 else
 	$(call log_attention, ".env file does not exist. Cannot create auth.json!")
 endif

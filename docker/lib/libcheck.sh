@@ -3,7 +3,7 @@
 # shellcheck disable=SC1091
 
 # Load Libraries
-. /opt/adnoctem/scripts/liblog.sh
+. /opt/adnoctem/lib/liblog.sh
 
 # Constants
 DATABASE_TIMEOUT=${DATABASE_TIMEOUT:-120}

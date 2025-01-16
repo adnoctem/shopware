@@ -1,15 +1,9 @@
 #!/bin/bash
 
-# shellcheck disable=SC1091
-
-# Load Libraries
-. /opt/adnoctem/scripts/liblog.sh
-
 # Constants
-
 # created with: https://patorjk.com/software/taag
 BANNER=$(
-cat << "EOF"
+cat <<- "EOF"
   ___      _   _   _            _                   _____       _ _           _   _
  / _ \    | | | \ | |          | |                 /  __ \     | | |         | | (_)
 / /_\ \ __| | |  \| | ___   ___| |_ ___ _ __ ___   | /  \/ ___ | | | ___  ___| |_ ___   _____
@@ -29,3 +23,22 @@ cat << "EOF"
 EOF
 )
 
+#######################################
+# Print our Ad Noctem banner for Shopware 6.
+#
+# Globals:
+#   BANNER
+# Arguments:
+#   None
+# Outputs:
+#   The banner.
+#######################################
+print_banner() {
+  source_url="https://github.com/adnoctem/shopware"
+
+  echo ""
+  echo "${BANNER}"
+  echo ""
+  echo "Welcome to the Ad Noctem Collective build of Shopware 6!"
+  echo "Read the entire source code on GitHub at: ${source_url}"
+}

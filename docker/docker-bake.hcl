@@ -21,7 +21,7 @@ variable "REGISTRIES" {
 
 # lock the image repository
 variable "REPO" {
-  default = "fmjstudios/shopware"
+  default = "adnoctem/shopware"
 }
 
 # set a default version
@@ -114,25 +114,7 @@ function "tags" {
   ])
 }
 
-# ==== Bake Groups ====
-group "default" {
-  targets = ["shopware-fcgi"]
-}
-
-group "nginx" {
-  targets = ["shopware-nginx"]
-}
-
-group "aio" {
-  targets = ["shopware-aio", "shopware-nginx-aio"]
-}
-
-group "all" {
-  targets = ["shopware", "shopware-nginx", "shopware-aio", "shopware-nginx-aio"]
-}
-
-# ==== Bake Targets ====
-# The (base) application image
+# Base configuration to inherit from
 target "base" {
   args = {
     VERSION = VERSION != null ? VERSION : "latest"
@@ -165,10 +147,28 @@ target "base" {
   output = ["type=docker"]
 }
 
+# ==== Bake Groups ====
+group "default" {
+  targets = ["shopware-fcgi"]
+}
+
+group "nginx" {
+  targets = ["shopware-nginx"]
+}
+
+group "aio" {
+  targets = ["shopware-aio", "shopware-nginx-aio"]
+}
+
+group "all" {
+  targets = ["shopware", "shopware-nginx", "shopware-aio", "shopware-nginx-aio"]
+}
+
+# ==== Bake Targets ====
 # Basic Shopware image exposing PHP-FPM's FCGI listener
 target "shopware-fcgi" {
   name       = "shopware-fcgi-php${replace(php, ".", "-")}-${tgt}"
-  dockerfile = "Dockerfile"
+  dockerfile = "docker/new.Dockerfile"
   inherits = ["base"]
   matrix = {
     php = get_php_version()
@@ -193,7 +193,7 @@ target "shopware-nginx" {
     tgt = get_target()
   }
   contexts = {
-    base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
+    base = "docker-image://adnoctem/shopware:${latest_or_version(tgt)}"
   }
   # NOTE: never update latest for a non-fcgi image
   tags = setsubtract(tags("-nginx", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"])
@@ -208,7 +208,7 @@ target "shopware-aio" {
     tgt = get_target()
   }
   contexts = {
-    base = "docker-image://fmjstudios/shopware:${latest_or_version(tgt)}"
+    base = "docker-image://adnoctem/shopware:${latest_or_version(tgt)}"
   }
   tags = setsubtract(tags("-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]) # see note above
 }
@@ -222,7 +222,7 @@ target "shopware-nginx-aio" {
     tgt = get_target()
   }
   contexts = {
-    base = join("", ["docker-image://fmjstudios/shopware:", tgt != "dev" ? "${VERSION}-nginx" : "${VERSION}-nginx-dev"])
+    base = join("", ["docker-image://adnoctem/shopware:", tgt != "dev" ? "${VERSION}-nginx" : "${VERSION}-nginx-dev"])
   }
   tags = setsubtract(tags("-nginx-aio", tgt), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]) # see note above
 }
