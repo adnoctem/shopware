@@ -1,6 +1,10 @@
-# shellcheck shell=bash
-
-# Colorize strings logged to stdout.
+#!/bin/bash
+#
+# Copyright Ad Noctem Collective. All Rights Reserved.
+# SPDX-License-Idenifier: MIT
+#
+# Library of Bash shell functions to provide the ability to print colored output for our shell
+# scripts to indicate results like sucess, failure, warn, attention etc.
 
 #######################################
 # Log to stdout, either colorized or not.

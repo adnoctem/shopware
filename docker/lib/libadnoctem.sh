@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Copyright Ad Noctem Collective. All Rights Reserved.
+# SPDX-License-Idenifier: MIT
+#
+# Library of Bash shell functions to hold an print a weclome banner on container startup. Mainly
+# to differentiate between PHP-FPM outputs and entrypoint script outputs but also for a better UX.
 
 # Constants
 # created with: https://patorjk.com/software/taag
@@ -24,7 +30,7 @@ EOF
 )
 
 #######################################
-# Print our Ad Noctem banner for Shopware 6.
+# Print our banner for Shopware 6.
 #
 # Globals:
 #   BANNER

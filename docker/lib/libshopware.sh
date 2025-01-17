@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Copyright Ad Noctem Collective. All Rights Reserved.
+# SPDX-License-Idenifier: MIT
+#
+# Library of Bash shell functions to handle various common Shopware 6 tasks like the full
+# installation or separate steps like installing all plugins, clearing the HTTP cache, etc.
 
 # shellcheck disable=SC1091
 

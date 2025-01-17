@@ -7,16 +7,18 @@
 # ref: https://github.com/docker-library/wordpress
 
 ARG PHP_VERSION=8.3
+ARG NODE_VERSION=20.18.1
+# use --with-dev-dependencies for development (see docker-bake.hcl)
+ARG BUILD_CMD="shopware-cli project ci ."
+ARG APP_ENV=prod
 
-#FROM node:$NODE_VERSION-bookworm AS node
 FROM php:$PHP_VERSION-fpm AS base
 
-ARG NODE_VERSION=20.18.1
+ARG NODE_VERSION
+ARG APP_ENV
 
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
 WORKDIR /var/www/html
-
-ARG APP_ENV=prod
 
 # install PHP \
 # install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
@@ -120,82 +122,85 @@ RUN set -eux; \
 RUN set -eux; \
 	{ \
 		echo 'expose_php=Off'; \
-        echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
-        echo 'display_errors=Off'; \
-        echo 'display_startup_errors=Off'; \
+    echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
+    echo 'display_errors=Off'; \
+    echo 'display_startup_errors=Off'; \
 		echo 'log_errors = On'; \
 		echo 'error_log = /dev/stderr'; \
 		echo 'log_errors_max_len = 1024'; \
 		echo 'ignore_repeated_errors = On'; \
 		echo 'ignore_repeated_source = Off'; \
-        echo 'html_errors = Off'; \
-        echo 'upload_max_filesize=32M'; \
-        echo 'post_max_size=32M'; \
-        echo 'max_execution_time=120'; \
-        echo 'memory_limit=512M'; \
+    echo 'html_errors = Off'; \
+    echo 'upload_max_filesize=32M'; \
+    echo 'post_max_size=32M'; \
+    echo 'max_execution_time=120'; \
+    echo 'memory_limit=512M'; \
 	} > /usr/local/etc/php/conf.d/general.ini
 
 # set recommended session PHP.ini settings
 RUN set -eux; \
 	{ \
 		echo 'session.cookie_lifetime=0'; \
-        echo 'session.save_handler=files'; \
-        echo 'session.save_path='; \
-        echo 'session.gc_probability=0'; \
-        echo 'session.gc_maxlifetime=1440'; \
+    echo 'session.save_handler=files'; \
+    echo 'session.save_path='; \
+    echo 'session.gc_probability=0'; \
+    echo 'session.gc_maxlifetime=1440'; \
 	} > /usr/local/etc/php/conf.d/session.ini
 
 # set recommended OPCache PHP.ini settings
 # see https://secure.php.net/manual/en/opcache.installation.php
 RUN set -eux; \
 	{ \
-        echo 'opcache.enable_cli=0'; \
-        echo 'opcache.enable_file_override=1'; \
-        echo 'opcache.validate_timestamps=0'; \
-        echo 'opcache.interned_strings_buffer=20'; \
-        echo 'opcache.file_cache='; \
-        echo 'opcache.file_cache_only=0'; \
-        echo 'opcache.memory_consumption=128'; \
-        echo 'opcache.max_accelerated_files=10000'; \
-        echo 'opcache.revalidate_freq=2'; \
-        echo 'zend.assertions=-1'; \
-        echo 'zend.detect_unicode=0'; \
+    echo 'opcache.enable_cli=0'; \
+    echo 'opcache.enable_file_override=1'; \
+    echo 'opcache.validate_timestamps=0'; \
+    echo 'opcache.interned_strings_buffer=20'; \
+    echo 'opcache.file_cache='; \
+    echo 'opcache.file_cache_only=0'; \
+    echo 'opcache.memory_consumption=128'; \
+    echo 'opcache.max_accelerated_files=10000'; \
+    echo 'opcache.revalidate_freq=2'; \
+    echo 'zend.assertions=-1'; \
+    echo 'zend.detect_unicode=0'; \
 	} > /usr/local/etc/php/conf.d/opcache.ini
 
 # set recommended realpath PHP.ini settings
 RUN set -eux; \
 	{ \
 		echo 'realpath_cache_ttl=4096k'; \
-        echo 'realpath_cache_size=3600'; \
+    echo 'realpath_cache_size=3600'; \
 	} > /usr/local/etc/php/conf.d/realpath.ini
 
 # set recommended PHP-FPM settings
 RUN set -eux; \
 	{ \
-        echo '[global]'; \
-        echo 'daemonize=no'; \
-        echo 'error_log=/proc/self/fd/2'; \
-      # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
-        echo 'log_limit = 8192'; \
-        echo '[www]'; \
-        echo 'listen=/run/php/php-fpm.sock'; \
-        echo 'listen.mode=0660'; \
-        echo 'pm=dynamic'; \
-        echo 'pm.max_children=15'; \
-        echo 'pm.start_servers=5'; \
-        echo 'pm.min_spare_servers=2'; \
-        echo 'pm.max_spare_servers=5'; \
-        echo 'pm.max_spawn_rate=2'; \
-        echo 'pm.process_idle_timeout=10s'; \
-        echo 'pm.max_requests=0'; \
-        echo 'pm.status_path=/-/fpm/status'; \
-        echo 'ping.path=/-/fpm/ping'; \
-        echo 'access.log=/dev/null'; \
-        echo 'rlimit_files=8192'; \
-        echo 'catch_workers_output=yes'; \
-        echo 'decorate_workers_output=no'; \
-        echo 'clear_env=no'; \
-        echo 'php_admin_flag[log_errors]=on'; \
+    echo '[global]'; \
+    echo 'daemonize=no'; \
+    echo 'error_log=/proc/self/fd/2'; \
+    echo 'include=etc/php-fpm.d/*.conf'; \
+  # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
+    echo 'log_limit = 8192'; \
+    echo '[www]'; \
+    echo 'user=1001'; \
+    echo 'group=1001'; \
+    echo 'listen=/run/php/php-fpm.sock'; \
+    echo 'listen.mode=0660'; \
+    echo 'pm=dynamic'; \
+    echo 'pm.max_children=15'; \
+    echo 'pm.start_servers=5'; \
+    echo 'pm.min_spare_servers=2'; \
+    echo 'pm.max_spare_servers=5'; \
+    echo 'pm.max_spawn_rate=2'; \
+    echo 'pm.process_idle_timeout=10s'; \
+    echo 'pm.max_requests=0'; \
+    echo 'pm.status_path=/-/fpm/status'; \
+    echo 'ping.path=/-/fpm/ping'; \
+    echo 'access.log=/dev/null'; \
+    echo 'rlimit_files=8192'; \
+    echo 'catch_workers_output=yes'; \
+    echo 'decorate_workers_output=no'; \
+    echo 'clear_env=no'; \
+    echo 'php_admin_flag[log_errors]=on'; \
 	} > /usr/local/etc/php-fpm.d/docker.conf
 
 # install composer
@@ -211,13 +216,70 @@ RUN set -eux; \
 #COPY --from=node /usr/local/lib /usr/local/lib
 #COPY --from=node /usr/local/bin/node /usr/local/bin/np* /usr/local/bin/
 
+# default environment variables for Shopware 6
 ENV COMPOSER_HOME=/tmp/composer \
     COMPOSER_CACHE_DIR=/tmp/composer/cache \
     COMPOSER_ALLOW_SUPERUSER=1 \
     npm_config_cache=/tmp/npm/cache \
     # set required defaults for a Shopware build
-    APP_ENV=${APP_ENV} \
-    APP_URL_CHECK_DISABLED=1
+    APP_ENV=$APP_ENV \
+    APP_SECRET="" \
+    APP_URL="https://shopware.internal" \
+    APP_URL_CHECK_DISABLED=1 \
+    INSTANCE_ID="" \
+    LOCK_DSN=flock \
+    MAILER_DSN=null://null \
+    DATABASE_URL="mysql://shopware:shopware@mysql:3306/shopware" \
+    BLUE_GREEN_DEPLOYMENT=0 \
+    # HTTP caching settings (disabled by default)
+    SHOPWARE_HTTP_CACHE_ENABLED=0 \
+    SHOPWARE_HTTP_DEFAULT_TTL=7200 \
+    SHOPWARE_CACHE_ID=docker \
+    SHOPWARE_SKIP_WEBINSTALLER=1 \
+    STOREFRONT_PROXY_URL=${APP_URL:-"https://shopware.internal"} \
+    # disable ElasticSearch/OpenSearch by default
+    SHOPWARE_ES_ENABLED=0 \
+    OPENSEARCH_URL="http://opensearch:9200" \
+    SHOPWARE_ES_INDEXING_ENABLED=0 \
+    SHOPWARE_ES_INDEX_PREFIX="sw" \
+    SHOPWARE_ES_THROW_EXCEPTION=1 \
+    # force the use of the Composer-based plugin loader
+    # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/build-w-o-db.html#compiling-the-administration-without-database
+    COMPOSER_PLUGIN_LOADER=1 \
+    COMPOSER_HOME="/tmp/composer" \
+    # disable OpenTelemetry by default
+    OTEL_PHP_AUTOLOAD_ENABLED=false \
+    OTEL_PHP_DISABLED_INSTRUMENTATIONS=shopware \
+    OTEL_SERVICE_NAME=shopware \
+    OTEL_TRACES_EXPORTER=otlp \
+    OTEL_LOGS_EXPORTER=otlp \
+    OTEL_METRICS_EXPORTER=otlp \
+    OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
+    OTEL_EXPORTER_OTLP_ENDPOINT="https://tempo:4317" \
+    # S3 configuration
+    S3_PUBLIC_BUCKET=shop6-public \
+    S3_PRIVATE_BUCKET=shop6-private \
+    S3_REGION=eu-north-1 \
+    S3_ACCESS_KEY=CHANGEME \
+    S3_SECRET_KEY=CHANGEME \
+    S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
+    S3_CDN_URL="https://assets.shop.adnoctem.co" \
+    S3_USE_PATH_STYLE_ENDPOINT="true" \
+    # Redis overrides
+    PHP_SESSION_HANDLER="redis" \
+    PHP_SESSION_SAVE_PATH="tcp://redis:6379" \
+    REDIS_URL="redis://redis:6379" \
+    # build settings
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    DISABLE_ADMIN_COMPILATION_TYPECHECK=true \
+    # deployment-helper - define defaults
+    INSTALL_LOCALE=en-GB \
+    INSTALL_CURRENCY=EUR \
+    SALES_CHANNEL_URL=${APP_URL:-"https://shopware.internal"}
 
 RUN set -eux; \
     apt-get update; \
@@ -225,14 +287,13 @@ RUN set -eux; \
         curl \
 		libcurl4-openssl-dev \
     ; \
-    # manual installation of various software
     old_wd=$(pwd) ; \
     cd /tmp ; \
-    # Node.js
+    # Node.js and npm/npx
     curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz ; \
     tar -f node-v$NODE_VERSION-linux-x64.tar.gz -zx --exclude="*.md" --exclude="LICENSE" --exclude="include"  --exclude="share"  -C /usr/local --strip-components 1 ;\
     cd /tmp && rm -rf /tmp/node-* ; \
-    # trurl
+    # static trurl binary
     curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
     tar --extract --file trurl-0.16.tar.gz ; \
     cd trurl-0.16 ; \
@@ -256,8 +317,8 @@ RUN set -eux; \
 
 FROM base AS builder
 
-# use --with-dev-dependencies for development (see docker-bake.hcl)
-ARG BUILD_CMD="shopware-cli project ci ."
+ARG BUILD_CMD
+
 
 #RUN set -eux; \
 #    apt-get update; \
@@ -283,45 +344,52 @@ RUN --mount=type=cache,target=/tmp/composer/cache \
     # mitigate invalid S3 credentials
     --mount=type=secret,id=S3_ACCESS_KEY,env=AWS_ACCESS_KEY_ID \
     --mount=type=secret,id=S3_SECRET_KEY,env=AWS_SECRET_ACCESS_KEY \
-    ${BUILD_CMD} ; \
+    $BUILD_CMD ; \
     rm -rf ./docker ; \
     echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-RUN set -eux; \
-    # cp --parents is broken
-    # ref: https://groups.google.com/g/linux.debian.bugs.dist/c/_vFG9_zagAA
-    mkdir -p /tmp/rootfs/usr/local /tmp/rootfs/var/www; \
-    cp -a --parents /var/www/html /tmp/rootfs ; \
-    cp -a --parents /usr/local/lib /tmp/rootfs ; \
-    cp -a --parents /usr/local/bin /tmp/rootfs ; \
-    cp -a --parents /usr/local/sbin /tmp/rootfs ; \
-    cp -a --parents /usr/local/etc /tmp/rootfs
+#RUN set -eux; \
+#    # cp --parents is broken
+#    # ref: https://groups.google.com/g/linux.debian.bugs.dist/c/_vFG9_zagAA
+#    mkdir -p /tmp/rootfs/usr/local /tmp/rootfs/var/www; \
+#    cp -a --parents /var/www/html /tmp/rootfs ; \
+#    cp -a --parents /usr/local/lib /tmp/rootfs ; \
+#    cp -a --parents /usr/local/bin /tmp/rootfs ; \
+#    cp -a --parents /usr/local/sbin /tmp/rootfs ; \
+#    cp -a --parents /usr/local/etc /tmp/rootfs
 
-FROM gcr.io/distroless/base-debian12
-
-COPY --from=busybox /bin/sh /bin/bash
-SHELL ["/bin/bash", "-c"]
-
-ENV PHP_INI_DIR=/usr/local/etc/php \
-    PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+FROM debian:bookworm-slim
 
 # configure the image and required directories
-# RUN set -eux; \
-#    mkdir -p /run/php /opt/adnoctem /var/www/html; \
-#    chmod g+rwX /opt/adnoctem /run/php /var/www/html
+RUN set -eux; \
+  mkdir -p /run/php /opt/adnoctem /var/www/html; \
+  chmod g+rwX /opt/adnoctem; \
+  chmod g+rwX /run/php
+
+COPY --chmod=644 docker/lib /opt/adnoctem/lib/
+COPY --chmod=644 docker/bin /opt/adnoctem/bin/
 
 WORKDIR /var/www/html
 VOLUME ["/var/www/html"]
+
+ENV PHP_INI_DIR=/usr/local/etc/php \
+    PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH"
 
 # ref: https://unix.stackexchange.com/questions/556748/how-to-check-whether-a-socket-is-listening-or-not
 HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
    CMD socat -u OPEN:/dev/null UNIX-CONNECT:/run/php/php-fpm.sock || exit 1
 
-COPY --from=builder /tmp/rootfs /
-COPY --chmod=644 docker/lib /opt/adnoctem/lib/
-COPY --chmod=644 docker/bin /opt/adnoctem/bin/
+COPY --from=builder /var/www/html ./
+COPY --from=builder /usr/local/lib/node* /usr/local/lib/
+COPY --from=builder /usr/local/bin/php /usr/local/bin/node /usr/local/bin/
+COPY --from=builder /usr/local/sbin /usr/local/sbin/
+COPY --from=builder /usr/local/etc /usr/local/etc/
 
-RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
+RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
+    ln -s /usr/local/bin/npm /usr/local/lib/node_modules/npm/bin/npm-cli.js; \
+    ln -s /usr/local/bin/npx /usr/local/lib/node_modules/npm/bin/npx-cli.js; \
+    chmod u+rwX -R /var/www/html \
+
 USER 1001
 
 ENTRYPOINT ["entrypoint.sh"]

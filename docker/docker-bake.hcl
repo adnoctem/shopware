@@ -78,8 +78,10 @@ function "get_target" {
   result = flatten(split(",", TARGETS))
 }
 
-function "get_build_arg" {
-  params = [target]
+function "get_build_command" {
+  params = [
+    target
+  ]
   result = target == "prod" ? "shopware-cli project ci ." : "shopware-cli project ci --with-dev-dependencies ."
 }
 
@@ -185,7 +187,7 @@ target "shopware-new" {
   args = {
     PHP_VERSION = php
     APP_ENV     = tgt
-    BUILD_CMD = get_build_arg(tgt)
+    BUILD_CMD = get_build_command(tgt)
   }
   # target = tgt
   tags = tags(

@@ -17,10 +17,26 @@ print_banner
 
 installed=$(is_shopware_installed)
 
-# validate the various connections are available
-database_connection_check
-opensearch_connection_check
-redis_connection_check
+# MySQL/MariaDB
+if [[ -n "${DATABASE_URL}" ]]; then
+  database_connection_check
+fi
+
+# OpenSearch
+if [[ -n "${OPENSEARCH_URL}" ]]; then
+  opensearch_connection_check
+fi
+
+# Redis
+if [[ -n "${REDIS_URL}" ]]; then
+  redis_connection_check
+fi
+
+# RabbitMQ
+if [[ -n "${MESSENGER_TRANSPORT_DSN}" ]]; then
+  rabbitmq_connection_check
+fi
+
 
 # if we're trying to run PHP-FPM for Shopware, check if it's even installed
 if [[ $1 == "php-fpm" ]]; then
