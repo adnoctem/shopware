@@ -7,12 +7,16 @@
 # ref: https://github.com/docker-library/wordpress
 
 ARG PHP_VERSION=8.3
-ARG NODE_VERSION=20
 
-FROM node:$NODE_VERSION-bookworm AS node
+#FROM node:$NODE_VERSION-bookworm AS node
 FROM php:$PHP_VERSION-fpm AS base
 
+ARG NODE_VERSION=20.18.1
+
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+WORKDIR /var/www/html
+
+ARG APP_ENV=prod
 
 # install PHP \
 # install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
@@ -203,50 +207,68 @@ RUN set -eux; \
     php -r "unlink('composer-setup.php');"; \
     mv composer.phar /usr/local/bin/composer
 
-# install Node.js and NPM at the given version
-COPY --from=node /usr/local/lib /usr/local/lib
-COPY --from=node /usr/local/bin /usr/local/bin
-
-WORKDIR /var/www/html
+## install Node.js and NPM at the given version
+#COPY --from=node /usr/local/lib /usr/local/lib
+#COPY --from=node /usr/local/bin/node /usr/local/bin/np* /usr/local/bin/
 
 ENV COMPOSER_HOME=/tmp/composer \
     COMPOSER_CACHE_DIR=/tmp/composer/cache \
     COMPOSER_ALLOW_SUPERUSER=1 \
     npm_config_cache=/tmp/npm/cache \
     # set required defaults for a Shopware build
-    APP_ENV=prod \
+    APP_ENV=${APP_ENV} \
     APP_URL_CHECK_DISABLED=1
-
-FROM base AS builder
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends \
-      ca-certificates \
-      curl; \
-    mkdir -p /tmp/lib && cd /lib; \
-    ldd /usr/local/bin/php | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib; \
-    ldd /usr/local/sbin/php-fpm | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib
+	  apt-get install -y --no-install-recommends \
+        curl \
+		libcurl4-openssl-dev \
+    ; \
+    # manual installation of various software
+    old_wd=$(pwd) ; \
+    cd /tmp ; \
+    # Node.js
+    curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz ; \
+    tar -f node-v$NODE_VERSION-linux-x64.tar.gz -zx --exclude="*.md" --exclude="LICENSE" --exclude="include"  --exclude="share"  -C /usr/local --strip-components 1 ;\
+    cd /tmp && rm -rf /tmp/node-* ; \
+    # trurl
+    curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
+    tar --extract --file trurl-0.16.tar.gz ; \
+    cd trurl-0.16 ; \
+    make && make install ; \
+    cd "/tmp" && rm -rf /tmp/trurl*; \
+    # static socat binary - see: https://github.com/ernw/static-toolbox
+    curl -fLO https://github.com/ernw/static-toolbox/releases/download/socat-v1.7.4.4/socat-1.7.4.4-x86_64 ; \
+    chmod +x socat-1.7.4.4-x86_64 ; \
+    mv socat-1.7.4.4-x86_64 /usr/local/bin/socat ; \
+    # static jq binary - see: https://jqlang.github.io/jq/download/ \
+    curl -fLO https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 ; \
+    chmod +x jq-linux-amd64 ; \
+    mv jq-linux-amd64 /usr/local/bin/jq ; \
+    # move back
+    cd "$old_wd" ; \
+    # install Shopware CLI \
+    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash ; \
+    apt-get install -y --no-install-recommends shopware-cli ; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl; \
+    rm -rf /var/lib/apt/lists/*
 
-# install Shopware-CLI
-# ref: https://sw-cli.fos.gg/install/
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash ; \
-    apt-get install -y --no-install-recommends shopware-cli
+FROM base AS builder
 
-#FROM builder AS devbuild
-#
-#ADD --chmod=740 . .
-#RUN --mount=type=cache,target=/tmp/composer/cache \
-#    --mount=type=cache,target=/tmp/npm/cache \
-#    shopware-cli project ci --with-dev-dependencies . ; \
-#    rm -rf ./docker ; \
-#    echo "$(date '+%d-%m-%Y_%T')" >> install.lock
-#
-#FROM builder AS prodbuild
+# use --with-dev-dependencies for development (see docker-bake.hcl)
+ARG BUILD_CMD="shopware-cli project ci ."
 
-#ENV APP_ENV=prod
+#RUN set -eux; \
+#    apt-get update; \
+#    apt-get install -y --no-install-recommends \
+#      ca-certificates \
+#      curl; \
+#    mkdir -p /tmp/lib && cd /lib; \
+#    ldd /usr/local/bin/php | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib; \
+#    ldd /usr/local/sbin/php-fpm | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib
 
-# link files for production build
+# link files for build
 COPY --link --chmod=740 . .
 RUN --mount=type=cache,target=/tmp/composer/cache \
     --mount=type=cache,target=/tmp/npm/cache \
@@ -261,76 +283,46 @@ RUN --mount=type=cache,target=/tmp/composer/cache \
     # mitigate invalid S3 credentials
     --mount=type=secret,id=S3_ACCESS_KEY,env=AWS_ACCESS_KEY_ID \
     --mount=type=secret,id=S3_SECRET_KEY,env=AWS_SECRET_ACCESS_KEY \
-    shopware-cli project ci . ; \
+    ${BUILD_CMD} ; \
     rm -rf ./docker ; \
     echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-FROM debian:bookworm-slim AS final
-
-ENV PHP_INI_DIR=/usr/local/etc/php
-
-# persistent dependencies
 RUN set -eux; \
-	apt-get update; \
-	apt-get install -y --no-install-recommends \
-      ca-certificates \
-      jq \
-      libfcgi-bin \
-	; \
-	rm -rf /var/lib/apt/lists/*
+    # cp --parents is broken
+    # ref: https://groups.google.com/g/linux.debian.bugs.dist/c/_vFG9_zagAA
+    mkdir -p /tmp/rootfs/usr/local /tmp/rootfs/var/www; \
+    cp -a --parents /var/www/html /tmp/rootfs ; \
+    cp -a --parents /usr/local/lib /tmp/rootfs ; \
+    cp -a --parents /usr/local/bin /tmp/rootfs ; \
+    cp -a --parents /usr/local/sbin /tmp/rootfs ; \
+    cp -a --parents /usr/local/etc /tmp/rootfs
 
-# manual install of 'trurl'
-RUN set -eux; \
-    apt-get update; \
-	  apt-get install -y --no-install-recommends \
-        curl \
-		libcurl4-openssl-dev \
-    ; \
-    # manual build
-    old_wd=$(pwd) ; \
-    cd /tmp ; \
-    curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
-    tar --extract --file trurl-0.16.tar.gz ; \
-    cd trurl-0.16 ; \
-    make && make install ; \
-    cd "$old_wd" && rm -rf /tmp/trurl*; \
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ; \
-      rm -rf /var/lib/apt/lists/*
+FROM gcr.io/distroless/base-debian12
 
-SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
-WORKDIR /var/www/html
+COPY --from=busybox /bin/sh /bin/bash
+SHELL ["/bin/bash", "-c"]
 
-# add a healthcheck
-# ref: https://maxchadwick.xyz/blog/getting-the-php-fpm-status-from-the-command-line
-HEALTHCHECK --start-period=3m --timeout=10s --interval=15s --retries=25 \
-   CMD cgi-fcgi -bind -connect /run/php/php-fpm.sock | grep -q "Status" || exit 1
-
-COPY --from=builder /tmp/lib /lib
-COPY --from=base /usr/local/lib/php /usr/local/lib/node* /usr/local/lib/
-COPY --from=base /usr/local/bin/php /usr/local/bin/node /usr/local/bin/
-COPY --from=base /usr/local/sbin/php* /usr/local/sbin/
-COPY --from=base /usr/local/etc /usr/local/etc/
+ENV PHP_INI_DIR=/usr/local/etc/php \
+    PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH"
 
 # configure the image and required directories
-RUN set -eux; \
-    mkdir -p /run/php /opt/adnoctem; \
-    chmod g+rwX /opt/adnoctem; \
-    PATH="/opt/adnoctem/bin:$PATH"
+# RUN set -eux; \
+#    mkdir -p /run/php /opt/adnoctem /var/www/html; \
+#    chmod g+rwX /opt/adnoctem /run/php /var/www/html
 
+WORKDIR /var/www/html
+VOLUME ["/var/www/html"]
+
+# ref: https://unix.stackexchange.com/questions/556748/how-to-check-whether-a-socket-is-listening-or-not
+HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
+   CMD socat -u OPEN:/dev/null UNIX-CONNECT:/run/php/php-fpm.sock || exit 1
+
+COPY --from=builder /tmp/rootfs /
 COPY --chmod=644 docker/lib /opt/adnoctem/lib/
 COPY --chmod=644 docker/bin /opt/adnoctem/bin/
 
+RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
+USER 1001
+
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["php-fpm", "-F"]
-
-FROM final AS dev
-
-COPY --from=builder /var/www/html/. .
-RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
-USER 1001
-
-FROM final AS prod
-
-COPY --from=builder /var/www/html/. .
-RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
-USER 1001

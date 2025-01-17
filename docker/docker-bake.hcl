@@ -78,6 +78,11 @@ function "get_target" {
   result = flatten(split(",", TARGETS))
 }
 
+function "get_build_arg" {
+  params = [target]
+  result = target == "prod" ? "shopware-cli project ci ." : "shopware-cli project ci --with-dev-dependencies ."
+}
+
 function "get_php_version" {
   params = []
   result = flatten(split(",", PHP_VERSIONS))
@@ -164,7 +169,31 @@ group "all" {
   targets = ["shopware", "shopware-nginx", "shopware-aio", "shopware-nginx-aio"]
 }
 
+group "new" {
+  targets = ["shopware-new"]
+}
+
 # ==== Bake Targets ====
+target "shopware-new" {
+  name       = "shopware-new-php${replace(php, ".", "-")}-${tgt}"
+  dockerfile = "docker/new.Dockerfile"
+  inherits = ["base"]
+  matrix = {
+    php = get_php_version()
+    tgt = get_target()
+  }
+  args = {
+    PHP_VERSION = php
+    APP_ENV     = tgt
+    BUILD_CMD = get_build_arg(tgt)
+  }
+  # target = tgt
+  tags = tags(
+    "-${php}",
+    tgt
+  )
+}
+
 # Basic Shopware image exposing PHP-FPM's FCGI listener
 target "shopware-fcgi" {
   name       = "shopware-fcgi-php${replace(php, ".", "-")}-${tgt}"
