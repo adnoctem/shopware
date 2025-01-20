@@ -17,16 +17,14 @@ FROM php:$PHP_VERSION-fpm-bookworm AS base
 ARG NODE_VERSION
 ARG APP_ENV
 
-WORKDIR /var/www/html
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
 VOLUME ["/var/www/html"]
+WORKDIR /var/www/html
 
 # install PHP \
 # install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
 RUN set -ex; \
-	\
 	savedAptMark="$(apt-mark showmanual)"; \
-	\
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		libavif-dev \
@@ -112,15 +110,16 @@ RUN set -ex; \
 # strip built shared-objects to decrease size
     find "$extDir" -name '*.so' -type f -exec strip --strip-all {} \;
 
-# configure PHP and cleanup obsolete files
 RUN set -eux; \
+    # (re)move files & create directories
     mv "${PHP_INI_DIR}/php.ini-production" "${PHP_INI_DIR}/php.ini"; \
     rm -f /usr/local/etc/php-fpm.d/zz-docker.conf; \
     rm -f /usr/local/etc/php-fpm.d/www.conf; \
-    rm -f /usr/local/etc/php-fpm.d/www.conf.default
-
-# set recommended PHP.ini settings
-RUN set -eux; \
+    rm -f /usr/local/etc/php-fpm.d/www.conf.default; \
+    mkdir -m 755 -p /opt/adnoctem/bin /opt/adnoctem/lib; \
+    mkdir -m 775 -p /run/php && chmod 755 /var/www/html; \
+    \
+    # configure general PHP settings
 	{ \
     echo 'expose_php=Off'; \
     echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
@@ -136,21 +135,19 @@ RUN set -eux; \
     echo 'post_max_size=32M'; \
     echo 'max_execution_time=120'; \
     echo 'memory_limit=512M'; \
-	} > /usr/local/etc/php/conf.d/general.ini
-
-# set recommended session PHP.ini settings
-RUN set -eux; \
+	} > /usr/local/etc/php/conf.d/general.ini ; \
+    \
+  # set recommended session PHP.ini settings
 	{ \
 		echo 'session.cookie_lifetime=0'; \
     echo 'session.save_handler=files'; \
     echo 'session.save_path='; \
     echo 'session.gc_probability=0'; \
     echo 'session.gc_maxlifetime=1440'; \
-	} > /usr/local/etc/php/conf.d/session.ini
-
-# set recommended OPCache PHP.ini settings
-# see https://secure.php.net/manual/en/opcache.installation.php
-RUN set -eux; \
+	} > /usr/local/etc/php/conf.d/session.ini ; \
+    \
+  # set recommended OPCache PHP.ini settings
+  # see https://secure.php.net/manual/en/opcache.installation.php
 	{ \
     echo 'opcache.enable_cli=0'; \
     echo 'opcache.enable_file_override=1'; \
@@ -163,22 +160,19 @@ RUN set -eux; \
     echo 'opcache.revalidate_freq=2'; \
     echo 'zend.assertions=-1'; \
     echo 'zend.detect_unicode=0'; \
-	} > /usr/local/etc/php/conf.d/opcache.ini
-
-# set recommended realpath PHP.ini settings
-RUN set -eux; \
+	} > /usr/local/etc/php/conf.d/opcache.ini ; \
+    \
+  # set recommended realpath PHP.ini settings
 	{ \
 		echo 'realpath_cache_ttl=4096k'; \
     echo 'realpath_cache_size=3600'; \
-	} > /usr/local/etc/php/conf.d/realpath.ini
-
-# set recommended PHP-FPM settings
-RUN set -eux; \
+	} > /usr/local/etc/php/conf.d/realpath.ini ; \
+    \
+  # set recommended PHP-FPM settings
 	{ \
     echo '[global]'; \
     echo 'daemonize=no'; \
     echo 'error_log=/proc/self/fd/2'; \
-  #    echo 'include=etc/php-fpm.d/*.conf'; \
   # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
     echo 'log_limit = 8192'; \
     echo '[www]'; \
@@ -204,14 +198,46 @@ RUN set -eux; \
     echo 'php_admin_flag[log_errors]=on'; \
 	} > /usr/local/etc/php-fpm.d/docker.conf
 
-# install composer
+# install Node.js, Composer, jq, socat and Shopware-CLI
 RUN set -eux; \
-    old_wd=$(pwd) && cd /tmp; \
+    apt-get update; \
+	  apt-get install -y --no-install-recommends  \
+      curl; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives; \
+    # Shopware CLI - see: https://sw-cli.fos.gg/install/
+    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash; \
+    apt-get install -y --no-install-recommends shopware-cli; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives; \
+    cd /tmp ; \
+    # Node + npm/npx - see: https://nodejs.org/dist/
+    curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz; \
+    tar -f node-v$NODE_VERSION-linux-x64.tar.gz -zx --exclude="*.md" --exclude="LICENSE" --exclude="include"  --exclude="share"  -C /usr/local --strip-components 1;\
+    cd /tmp; \
+    # static trurl binary - see: https://jqlang.github.io/jq/download/
+    curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
+    tar --extract --file trurl-0.16.tar.gz ; \
+    cd trurl-0.16 ; \
+    make && make install ; \
+    cd /tmp; \
+    # static socat binary - see: https://github.com/ernw/static-toolbox
+    curl -fLO https://github.com/ernw/static-toolbox/releases/download/socat-v1.7.4.4/socat-1.7.4.4-x86_64 ; \
+    chmod +x socat-1.7.4.4-x86_64 ; \
+    mv socat-1.7.4.4-x86_64 /usr/local/bin/socat ; \
+    # static jq binary - see: https://jqlang.github.io/jq/download/ \
+    curl -fLO https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 ; \
+    chmod +x jq-linux-amd64 ; \
+    mv jq-linux-amd64 /usr/local/bin/jq ; \
+    cd /tmp; \
+    # install composer - see: \
     php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
     php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"; \
     php composer-setup.php; \
     php -r "unlink('composer-setup.php');"; \
-    mv composer.phar /usr/local/bin/composer
+    mv composer.phar /usr/local/bin/composer; \
+    cd /tmp; \
+    # remove installation-depedencies
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl; \
+    rm -rf /tmp/* /var/lib/apt/lists/* /var/cache/apt/archives
 
 ENV PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH" \
     COMPOSER_HOME=/tmp/composer \
@@ -250,38 +276,6 @@ ENV PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH" \
     S3_USE_PATH_STYLE_ENDPOINT="true" \
     REDIS_URL="redis://redis:6379"
 
-RUN set -eux; \
-    apt-get update; \
-	  apt-get install -y --no-install-recommends curl libcurl4-openssl-dev; \
-    rm -rf /var/lib/apt/lists/*; \
-    old_wd=$(pwd) ; \
-    cd /tmp ; \
-    # Node.js and npm/npx
-    curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz ; \
-    tar -f node-v$NODE_VERSION-linux-x64.tar.gz -zx --exclude="*.md" --exclude="LICENSE" --exclude="include"  --exclude="share"  -C /usr/local --strip-components 1 ;\
-    cd /tmp && rm -rf /tmp/node-* ; \
-    # static trurl binary
-    curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
-    tar --extract --file trurl-0.16.tar.gz ; \
-    cd trurl-0.16 ; \
-    make && make install ; \
-    cd "/tmp" && rm -rf /tmp/trurl*; \
-    # static socat binary - see: https://github.com/ernw/static-toolbox
-    curl -fLO https://github.com/ernw/static-toolbox/releases/download/socat-v1.7.4.4/socat-1.7.4.4-x86_64 ; \
-    chmod +x socat-1.7.4.4-x86_64 ; \
-    mv socat-1.7.4.4-x86_64 /usr/local/bin/socat ; \
-    # static jq binary - see: https://jqlang.github.io/jq/download/ \
-    curl -fLO https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 ; \
-    chmod +x jq-linux-amd64 ; \
-    mv jq-linux-amd64 /usr/local/bin/jq ; \
-    # move back
-    cd "$old_wd" ; \
-    # install Shopware CLI \
-    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash ; \
-    apt-get install -y --no-install-recommends shopware-cli; \
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl libcurl4-openssl-dev; \
-    rm -rf /var/lib/apt/lists/*
-
 FROM base AS builder
 
 ARG BUILD_CMD
@@ -306,14 +300,8 @@ RUN --mount=type=cache,target=/tmp/composer/cache \
     rm -rf ./docker ; \
     echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-# configure the image and required directories
-RUN set -eux; \
-  mkdir -p /run/php /opt/adnoctem /var/www/html; \
-  chmod g+rwX /opt/adnoctem; \
-  chmod g+rwX /run/php
-
-COPY --chmod=644 docker/lib /opt/adnoctem/lib/
-COPY --chmod=755 docker/bin /opt/adnoctem/bin/
+COPY --chmod=755 docker/lib/lib*.sh /opt/adnoctem/lib
+COPY --chmod=755 docker/bin/entrypoint.sh /opt/adnoctem/bin
 
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
     chmod u+rwX -R /var/www/html
@@ -322,6 +310,9 @@ RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
 HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
    CMD socat -u OPEN:/dev/null UNIX-CONNECT:/run/php/php-fpm.sock || exit 1
 
+# -------------------------------------
+# Final Image
+# -------------------------------------
 FROM builder AS final
 
 # cleanup
@@ -332,8 +323,10 @@ RUN set -eux; \
     | xargs -r dpkg-query --search \
     | cut -d: -f1 \
     | sort -u \
-    | xargs -r apt-mark manual \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    | xargs -r apt-mark manual; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    # remove obsolete packages
+    \
     PACKAGES=( \
       "gcc" \
       "gcc-12" \
@@ -353,10 +346,9 @@ RUN set -eux; \
     ) ; \
     for PKG in "${PACKAGES[@]}"; do \
         apt-get purge -y --auto-remove --allow-remove-essential "${PKG}" ; \
-    done
-
-RUN set -eux; \
-    find /usr/local/lib/php/ -mindepth 1 -maxdepth 1 ! -name extensions -exec rm -rf {} \; ;\
+    done ; \
+    # remove obsolete binaries and files
+    \
     LOCATIONS=( \
       /usr/local/bin/composer \
       /usr/local/bin/corepack \
@@ -373,8 +365,11 @@ RUN set -eux; \
     for LOC in "${LOCATIONS[@]}"; do \
       rm -rf ${LOC} ; \
     done ; \
+    find /usr/local/lib/php/ -mindepth 1 -maxdepth 1 ! -name extensions -exec rm -rf {} \; ;\
+    # final cleanup
+    \
     apt-get clean -y ; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives;
 
 USER 1001
 
