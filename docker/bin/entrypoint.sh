@@ -39,7 +39,7 @@ fi
 
 
 # if we're trying to run PHP-FPM for Shopware, check if it's even installed
-if [[ $1 == "php-fpm" ]]; then
+if [[ $1 == "php-fpm" || ${1#-} != "$1" ]]; then
   if [[ "$installed" -ne 0 ]]; then
     log::yellow "Shopware was not found to be installed. Running initial installation"
     shopware_install
@@ -47,6 +47,8 @@ if [[ $1 == "php-fpm" ]]; then
     log::yellow "Shopware is installed. Running deployment helper to sync installation"
     run_deployment_helper
   fi
+
+  set -- php-fpm "$@"
 elif [[ $1 == "message-worker" ]]; then
   run_message_worker
 elif [[ $1 == "cron-worker" ]]; then

@@ -12,13 +12,14 @@ ARG NODE_VERSION=20.18.1
 ARG BUILD_CMD="shopware-cli project ci ."
 ARG APP_ENV=prod
 
-FROM php:$PHP_VERSION-fpm AS base
+FROM php:$PHP_VERSION-fpm-bookworm AS base
 
 ARG NODE_VERSION
 ARG APP_ENV
 
-SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
 WORKDIR /var/www/html
+SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
+VOLUME ["/var/www/html"]
 
 # install PHP \
 # install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
@@ -35,10 +36,10 @@ RUN set -ex; \
 		libpng-dev \
 		libwebp-dev \
 		libzip-dev \
-        libbz2-dev \
-        libsodium-dev \
-        libzstd-dev \
-        zlib1g-dev \
+    libbz2-dev \
+    libsodium-dev \
+    libzstd-dev \
+    zlib1g-dev \
 	; \
 	\
 	docker-php-ext-configure gd \
@@ -53,11 +54,11 @@ RUN set -ex; \
 		gd \
 		intl \
 		mysqli \
-        pdo_mysql \
+    pdo_mysql \
 		zip \
-        sockets \
-        bz2 \
-        sodium \
+    sockets \
+    bz2 \
+    sodium \
 	; \
     \
 # install community extensions
@@ -91,7 +92,7 @@ RUN set -ex; \
 	[ -d "$extDir" ]; \
 # reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
 	apt-mark auto '.*' > /dev/null; \
-	apt-mark manual $savedAptMark; \
+	[ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; \
 	ldd "$extDir"/*.so \
 		| awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); printf "*%s\n", so }' \
 		| sort -u \
@@ -121,15 +122,15 @@ RUN set -eux; \
 # set recommended PHP.ini settings
 RUN set -eux; \
 	{ \
-		echo 'expose_php=Off'; \
+    echo 'expose_php=Off'; \
     echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
     echo 'display_errors=Off'; \
     echo 'display_startup_errors=Off'; \
-		echo 'log_errors = On'; \
-		echo 'error_log = /dev/stderr'; \
-		echo 'log_errors_max_len = 1024'; \
-		echo 'ignore_repeated_errors = On'; \
-		echo 'ignore_repeated_source = Off'; \
+    echo 'log_errors = On'; \
+    echo 'error_log = /dev/stderr'; \
+    echo 'log_errors_max_len = 1024'; \
+    echo 'ignore_repeated_errors = On'; \
+    echo 'ignore_repeated_source = Off'; \
     echo 'html_errors = Off'; \
     echo 'upload_max_filesize=32M'; \
     echo 'post_max_size=32M'; \
@@ -177,7 +178,7 @@ RUN set -eux; \
     echo '[global]'; \
     echo 'daemonize=no'; \
     echo 'error_log=/proc/self/fd/2'; \
-    echo 'include=etc/php-fpm.d/*.conf'; \
+  #    echo 'include=etc/php-fpm.d/*.conf'; \
   # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
     echo 'log_limit = 8192'; \
     echo '[www]'; \
@@ -212,81 +213,47 @@ RUN set -eux; \
     php -r "unlink('composer-setup.php');"; \
     mv composer.phar /usr/local/bin/composer
 
-## install Node.js and NPM at the given version
-#COPY --from=node /usr/local/lib /usr/local/lib
-#COPY --from=node /usr/local/bin/node /usr/local/bin/np* /usr/local/bin/
-
-# default environment variables for Shopware 6
-ENV COMPOSER_HOME=/tmp/composer \
+ENV PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH" \
+    COMPOSER_HOME=/tmp/composer \
     COMPOSER_CACHE_DIR=/tmp/composer/cache \
     COMPOSER_ALLOW_SUPERUSER=1 \
     npm_config_cache=/tmp/npm/cache \
-    # set required defaults for a Shopware build
-    APP_ENV=$APP_ENV \
-    APP_SECRET="" \
-    APP_URL="https://shopware.internal" \
-    APP_URL_CHECK_DISABLED=1 \
-    INSTANCE_ID="" \
-    LOCK_DSN=flock \
-    MAILER_DSN=null://null \
-    DATABASE_URL="mysql://shopware:shopware@mysql:3306/shopware" \
-    BLUE_GREEN_DEPLOYMENT=0 \
-    # HTTP caching settings (disabled by default)
-    SHOPWARE_HTTP_CACHE_ENABLED=0 \
-    SHOPWARE_HTTP_DEFAULT_TTL=7200 \
-    SHOPWARE_CACHE_ID=docker \
-    SHOPWARE_SKIP_WEBINSTALLER=1 \
-    STOREFRONT_PROXY_URL=${APP_URL:-"https://shopware.internal"} \
-    # disable ElasticSearch/OpenSearch by default
-    SHOPWARE_ES_ENABLED=0 \
-    OPENSEARCH_URL="http://opensearch:9200" \
-    SHOPWARE_ES_INDEXING_ENABLED=0 \
-    SHOPWARE_ES_INDEX_PREFIX="sw" \
-    SHOPWARE_ES_THROW_EXCEPTION=1 \
     # force the use of the Composer-based plugin loader
     # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/build-w-o-db.html#compiling-the-administration-without-database
     COMPOSER_PLUGIN_LOADER=1 \
-    COMPOSER_HOME="/tmp/composer" \
-    # disable OpenTelemetry by default
-    OTEL_PHP_AUTOLOAD_ENABLED=false \
-    OTEL_PHP_DISABLED_INSTRUMENTATIONS=shopware \
-    OTEL_SERVICE_NAME=shopware \
-    OTEL_TRACES_EXPORTER=otlp \
-    OTEL_LOGS_EXPORTER=otlp \
-    OTEL_METRICS_EXPORTER=otlp \
-    OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
-    OTEL_EXPORTER_OTLP_ENDPOINT="https://tempo:4317" \
-    # S3 configuration
-    S3_PUBLIC_BUCKET=shop6-public \
-    S3_PRIVATE_BUCKET=shop6-private \
-    S3_REGION=eu-north-1 \
-    S3_ACCESS_KEY=CHANGEME \
-    S3_SECRET_KEY=CHANGEME \
-    S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
-    S3_CDN_URL="https://assets.shop.adnoctem.co" \
-    S3_USE_PATH_STYLE_ENDPOINT="true" \
-    # Redis overrides
-    PHP_SESSION_HANDLER="redis" \
-    PHP_SESSION_SAVE_PATH="tcp://redis:6379" \
-    REDIS_URL="redis://redis:6379" \
-    # build settings
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     DISABLE_ADMIN_COMPILATION_TYPECHECK=true \
-    # deployment-helper - define defaults
-    INSTALL_LOCALE=en-GB \
-    INSTALL_CURRENCY=EUR \
-    SALES_CHANNEL_URL=${APP_URL:-"https://shopware.internal"}
+    # required (default) Shopware settings
+    APP_ENV=$APP_ENV \
+    LOCK_DSN=flock \
+    MAILER_DSN=null://null \
+    DATABASE_URL="mysql://shopware:shopware@mysql:3306/shopware" \
+    BLUE_GREEN_DEPLOYMENT=0 \
+    SHOPWARE_HTTP_CACHE_ENABLED=0 \
+    SHOPWARE_SKIP_WEBINSTALLER=1 \
+    SHOPWARE_ES_ENABLED=0 \
+    OPENSEARCH_URL="http://opensearch:9200" \
+    SHOPWARE_ES_INDEXING_ENABLED=0 \
+    SHOPWARE_ES_INDEX_PREFIX="sw" \
+    SHOPWARE_ES_THROW_EXCEPTION=1 \
+    S3_PUBLIC_BUCKET=shop6-public \
+    S3_PRIVATE_BUCKET=shop6-private \
+    S3_REGION=auto \
+    S3_ACCESS_KEY=CHANGEME \
+    S3_SECRET_KEY=CHANGEME \
+    S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
+    S3_CDN_URL="https://assets.shop.adnoctem.co" \
+    S3_USE_PATH_STYLE_ENDPOINT="true" \
+    REDIS_URL="redis://redis:6379"
 
 RUN set -eux; \
     apt-get update; \
-	  apt-get install -y --no-install-recommends \
-        curl \
-		libcurl4-openssl-dev \
-    ; \
+	  apt-get install -y --no-install-recommends curl libcurl4-openssl-dev; \
+    rm -rf /var/lib/apt/lists/*; \
     old_wd=$(pwd) ; \
     cd /tmp ; \
     # Node.js and npm/npx
@@ -311,28 +278,19 @@ RUN set -eux; \
     cd "$old_wd" ; \
     # install Shopware CLI \
     curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash ; \
-    apt-get install -y --no-install-recommends shopware-cli ; \
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl; \
+    apt-get install -y --no-install-recommends shopware-cli; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl libcurl4-openssl-dev; \
     rm -rf /var/lib/apt/lists/*
 
 FROM base AS builder
 
 ARG BUILD_CMD
 
-
-#RUN set -eux; \
-#    apt-get update; \
-#    apt-get install -y --no-install-recommends \
-#      ca-certificates \
-#      curl; \
-#    mkdir -p /tmp/lib && cd /lib; \
-#    ldd /usr/local/bin/php | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib; \
-#    ldd /usr/local/sbin/php-fpm | grep '=> /lib/' | cut -d' ' -f3 | sed 's#/lib/##g' | xargs -I % cp --parents "%" /tmp/lib
-
 # link files for build
 COPY --link --chmod=740 . .
 RUN --mount=type=cache,target=/tmp/composer/cache \
     --mount=type=cache,target=/tmp/npm/cache \
+    --mount=type=secret,id=composer_auth,target=/var/www/html/auth.json \
     --mount=type=secret,id=S3_PUBLIC_BUCKET,env=S3_PUBLIC_BUCKET \
     --mount=type=secret,id=S3_PRIVATE_BUCKET,env=S3_PRIVATE_BUCKET \
     --mount=type=secret,id=S3_REGION,env=S3_REGION \
@@ -348,18 +306,6 @@ RUN --mount=type=cache,target=/tmp/composer/cache \
     rm -rf ./docker ; \
     echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-#RUN set -eux; \
-#    # cp --parents is broken
-#    # ref: https://groups.google.com/g/linux.debian.bugs.dist/c/_vFG9_zagAA
-#    mkdir -p /tmp/rootfs/usr/local /tmp/rootfs/var/www; \
-#    cp -a --parents /var/www/html /tmp/rootfs ; \
-#    cp -a --parents /usr/local/lib /tmp/rootfs ; \
-#    cp -a --parents /usr/local/bin /tmp/rootfs ; \
-#    cp -a --parents /usr/local/sbin /tmp/rootfs ; \
-#    cp -a --parents /usr/local/etc /tmp/rootfs
-
-FROM debian:bookworm-slim
-
 # configure the image and required directories
 RUN set -eux; \
   mkdir -p /run/php /opt/adnoctem /var/www/html; \
@@ -367,30 +313,70 @@ RUN set -eux; \
   chmod g+rwX /run/php
 
 COPY --chmod=644 docker/lib /opt/adnoctem/lib/
-COPY --chmod=644 docker/bin /opt/adnoctem/bin/
+COPY --chmod=755 docker/bin /opt/adnoctem/bin/
 
-WORKDIR /var/www/html
-VOLUME ["/var/www/html"]
-
-ENV PHP_INI_DIR=/usr/local/etc/php \
-    PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH"
+RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
+    chmod u+rwX -R /var/www/html
 
 # ref: https://unix.stackexchange.com/questions/556748/how-to-check-whether-a-socket-is-listening-or-not
 HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
    CMD socat -u OPEN:/dev/null UNIX-CONNECT:/run/php/php-fpm.sock || exit 1
 
-COPY --from=builder /var/www/html ./
-COPY --from=builder /usr/local/lib/node* /usr/local/lib/
-COPY --from=builder /usr/local/bin/php /usr/local/bin/node /usr/local/bin/
-COPY --from=builder /usr/local/sbin /usr/local/sbin/
-COPY --from=builder /usr/local/etc /usr/local/etc/
+FROM builder AS final
 
-RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
-    ln -s /usr/local/bin/npm /usr/local/lib/node_modules/npm/bin/npm-cli.js; \
-    ln -s /usr/local/bin/npx /usr/local/lib/node_modules/npm/bin/npx-cli.js; \
-    chmod u+rwX -R /var/www/html \
+# cleanup
+RUN set -eux; \
+    find /usr/local -type f -executable -exec ldd '{}' ';' \
+    | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); print so }' \
+    | sort -u \
+    | xargs -r dpkg-query --search \
+    | cut -d: -f1 \
+    | sort -u \
+    | xargs -r apt-mark manual \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    PACKAGES=( \
+      "gcc" \
+      "gcc-12" \
+      "g++" \
+      "autoconf" \
+      "binutils" \
+      "pkg-config" \
+      "pkgconf" \
+      "make" \
+      "shopware-cli" \
+      #"perl" \
+      "gpg" \
+      "sed" \
+      #"xz-utils" \
+      "grep" \
+      #"gzip" \
+    ) ; \
+    for PKG in "${PACKAGES[@]}"; do \
+        apt-get purge -y --auto-remove --allow-remove-essential "${PKG}" ; \
+    done
+
+RUN set -eux; \
+    find /usr/local/lib/php/ -mindepth 1 -maxdepth 1 ! -name extensions -exec rm -rf {} \; ;\
+    LOCATIONS=( \
+      /usr/local/bin/composer \
+      /usr/local/bin/corepack \
+      /usr/local/bin/np* \
+      /usr/local/bin/docker-php-* \
+      /usr/local/bin/pear* \
+      /usr/local/bin/pecl \
+      /usr/local/bin/phar* \
+      /usr/local/bin/phpize \
+      /usr/local/bin/php-config \
+      /usr/local/php \
+      /usr/local/lib/node_modules \
+    ) ; \
+    for LOC in "${LOCATIONS[@]}"; do \
+      rm -rf ${LOC} ; \
+    done ; \
+    apt-get clean -y ; \
+    rm -rf /var/lib/apt/lists/*
 
 USER 1001
 
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["php-fpm", "-F"]
+CMD ["-F"]

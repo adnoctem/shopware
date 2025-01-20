@@ -194,6 +194,9 @@ target "shopware-new" {
     "-${php}",
     tgt
   )
+  secret = [
+    "type=file,id=composer_auth,src=auth.json"
+  ]
 }
 
 # Basic Shopware image exposing PHP-FPM's FCGI listener
