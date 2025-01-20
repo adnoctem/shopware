@@ -28,74 +28,70 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  nginx:
+    image: nginx:1.27
+    container_name: nginx
+    restart: always
+    environment:
+      PORT: 8000
+      HOSTNAME: shopware.internal
+      SOCKET_PATH: /run/php/php-fpm.sock
+    ports:
+      - "8000:8000"
+    volumes:
+      - sw-fpm-sock:/run/php:rw
+    networks:
+      - public
+      - internal
+    #    healthcheck:
+    #      test:
+    #        [
+    #          "CMD",
+    #          "curl",
+    #          "--fail",
+    #          "http://localhost:8000/api/_info/health-check",
+    #        ]
+    #      start_period: 3m
+    #      interval: 1m
+    #      timeout: 5s
+    #      retries: 10
+    labels:
+      - "application=nginx"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.nginx.entrypoints=https"
+      - "traefik.http.routers.nginx.tls=true"
+      - "traefik.http.routers.nginx.tls.domains[0].main=shopware.internal"
+      #- "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.internal"
+      - "traefik.http.routers.nginx.rule=Host(`shopware.internal`)"
+      - "traefik.http.routers.nginx.service=nginx"
+      - "traefik.http.services.nginx.loadbalancer.server.port=8000"
+      - "traefik.http.services.nginx.loadbalancer.sticky=true"
+      - "traefik.http.services.nginx.loadbalancer.sticky.cookie=true"
+    configs:
+      - source: nginx.conf
+        target: /etc/nginx/nginx.conf
+      - source: shopware-http.conf.tpl
+        target: /etc/nginx/templates/shopware-http.conf.template
+
   shopware:
     image: adnoctem/shopware:0.0.1
     container_name: shopware
     env_file: .env
-    #    entrypoint:
-    #      - /bin/bash
-    #      - -c
-    #      - sleep 86400
-    #    build:
-    #      context: .
-    #      dockerfile: docker/nginx.Dockerfile
-    #    develop:
-    #      watch:
-    #        - action: rebuild
-    #          path: composer.json
-    #        - action: sync
-    #          path: ./custom
-    #          target: /var/www/html/custom
-    #          ignore:
-    #            - vendor/
-    #        - action: sync
-    #          path: ./config
-    #          target: /var/www/html/config
-    #          ignore:
-    #            - vendor/
-    #        - action: sync
-    #          path: ./public
-    #          target: /var/www/html/public
-    #          ignore:
-    #            - vendor/
+    # uncomment for debugging
+    # entrypoint: [ "tail", "-f", "/dev/null" ]
     restart: unless-stopped
-    ports:
-      - "8000"
-    #    volumes:
-    #      - sw-files:/var/www/html/files:rw
-    #      - sw-theme:/var/www/html/public/theme:rw
-    #      - sw-media:/var/www/html/public/media:rw
-    #      - sw-thumbnail:/var/www/html/public/thumbnail:rw
-    #      - sw-sitemap:/var/www/html/public/sitemap:rw
+    volumes:
+      - sw-docroot:/var/www/html:rw
+      - sw-fpm-sock:/run/php:rw
     networks:
-      - public
       - internal
     labels:
       - "application=shopware"
-      - "traefik.enable=true"
-      - "traefik.docker.network=public"
-      - "traefik.http.routers.shopware.entrypoints=https"
-      - "traefik.http.routers.shopware.tls=true"
-      - "traefik.http.routers.shopware.tls.domains[0].main=shopware.internal"
-      #- "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.internal"
-      - "traefik.http.routers.shopware.rule=Host(`shopware.internal`)"
-      - "traefik.http.routers.shopware.service=shopware"
-      - "traefik.http.services.shopware.loadbalancer.server.port=8000"
-      - "traefik.http.services.shopware.loadbalancer.sticky=true"
-      - "traefik.http.services.shopware.loadbalancer.sticky.cookie=true"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "--fail",
-          "http://localhost:8000/api/_info/health-check",
-        ]
-      start_period: 3m
-      interval: 1m
-      timeout: 5s
-      retries: 10
+      - "traefik.enable=false"
     depends_on:
+      nginx:
+        condition: service_started
       traefik:
         condition: service_started
       mysql:
@@ -456,6 +452,10 @@ configs:
     file: deploy/conf/otel-collector-config.yaml
   my.cnf:
     file: deploy/conf/my.cnf
+  nginx.conf:
+    file: deploy/conf/nginx.conf
+  shopware-http.conf.tpl:
+    file: deploy/conf/shopware-http.conf.tpl
 
 # cannot be created inline reliably, because they produce a mount error with Docker Desktop + WSL2
 # ERROR: response from daemon: path /.../home/fmj/Software/Code/FMJStudios/shopware/secrets/ssl/server.pem is mounted on / but it is not a shared mount.
@@ -466,11 +466,8 @@ configs:
 #    file: ./secrets/ssl/server-key.pem
 
 volumes:
-  #  sw-files:
-  #  sw-theme:
-  #  sw-media:
-  #  sw-thumbnail:
-  #  sw-sitemap:
+  sw-docroot:
+  sw-fpm-sock:
   db-data:
   opensearch-data:
   tempo-data:

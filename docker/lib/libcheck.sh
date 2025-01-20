@@ -5,7 +5,7 @@
 #
 # Library of Bash shell functions to check the availability of connections to various systems,
 # by way of Bash's TCP/UDP support. See: https://www.man7.org/linux/man-pages/man1/bash.1.html
-# The systems mainly are MySQL, OpenSearch, Redis and RabbitMQ although others may be added.
+# The systems mainly are MySQL, OpenSearch, Redis and RabbitMQ although you're free to add to them.
 
 
 # shellcheck disable=SC1091
@@ -14,10 +14,11 @@
 . /opt/adnoctem/lib/liblog.sh
 
 # Constants
-DATABASE_TIMEOUT=${DATABASE_TIMEOUT:-120}
-OPENSEARCH_TIMEOUT=${OPENSEARCH_TIMEOUT:-120}
-REDIS_TIMEOUT=${REDIS_TIMEOUT:-120}
-RABBITMQ_TIMEOUT=${RABBITMQ_TIMEOUT:-120}
+CONNECTION_TIMEOUT=${CONNECTION_TIMEOUT:-5}
+DATABASE_TRIES=${DATABASE_TRIES:-60}
+OPENSEARCH_TRIES=${OPENSEARCH_TRIES:-60}
+REDIS_TRIES=${REDIS_TRIES:-60}
+RABBITMQ_TRIES=${RABBITMQ_TRIES:-60}
 
 #######################################
 # Check that the database connection available
@@ -25,6 +26,7 @@ RABBITMQ_TIMEOUT=${RABBITMQ_TIMEOUT:-120}
 #   DATABASE_URL
 #   DATABASE_HOST
 #   DATABASE_TIMEOUT
+#   CONNECTION_TIMEOUT
 # Arguments:
 #   None
 # Outputs:
@@ -40,18 +42,18 @@ database_connection_check() {
 	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
 	tries=0
 
-	until timeout "${DATABASE_TIMEOUT}" bash -c "cat </dev/tcp/${database_host}/${database_port:-3306}" &>/dev/null; do
-	  log::yellow "Waiting $((DATABASE_TIMEOUT - tries)) more seconds for MySQL/MariaDB connection to become available"
-	  sleep 1
-	  tries=$(( tries + 1))
+  until nc -z -w"${CONNECTION_TIMEOUT}" -v "${database_host}" "${database_port:-3306}" 2>/dev/null; do
+		log::yellow "Will try to establish a MySQL/MariaDB connection $((DATABASE_TRIES - tries)) more times"
+		sleep 1
+		tries=$((tries + 1))
 
-    if [ "$tries" -eq "${DATABASE_TIMEOUT}" ]; then
-      log::red "FATAL: Could not connect to MySQL/MariaDB within timeout of ${tries} seconds. Exiting."
-      exit 1
-    fi
+		if [ "$tries" -ge "${DATABASE_TRIES}" ]; then
+			log::red "FATAL: Could not establish a connection to MySQL/MariaDB within ${tries} tries. Exiting..."
+			exit 1
+		fi
 	done
 
-	log::green "MySQL/MariaDB connection is available!"
+	log::green "MySQL/MariaDB connection established!"
 }
 
 
@@ -63,6 +65,7 @@ database_connection_check() {
 #   OPENSEARCH_HOST
 #   OPENSEARCH_PORT
 #   OPENSEARCH_TIMEOUT
+#   CONNECTION_TIMEOUT
 # Arguments:
 #   None
 # Outputs:
@@ -78,18 +81,18 @@ opensearch_connection_check() {
 	es_port=${OPENSEARCH_PORT:-"$(trurl "$OPENSEARCH_URL" --get '{port}')"}
 	tries=0
 
-  until timeout "${OPENSEARCH_TIMEOUT}" bash -c "cat </dev/tcp/${es_host}/${es_port:-9200}" &>/dev/null; do
-		log:yellow "Waiting $((OPENSEARCH_TIMEOUT - tries)) more seconds for OpenSearch connection to become available"
+  until nc -z -w"${CONNECTION_TIMEOUT}" -v "${es_host}" "${es_port:-9200}" 2>/dev/null; do
+		log::yellow "Will try to establish a OpenSearch connection $((OPENSEARCH_TRIES - tries)) more times"
 		sleep 1
 		tries=$((tries + 1))
 
-		if [ "$tries" -eq "${OPENSEARCH_TIMEOUT}" ]; then
-			log::red "FATAL: Could not connect to OpenSearch within timeout of ${tries} seconds. Exiting."
+		if [ "$tries" -ge "${OPENSEARCH_TRIES}" ]; then
+			log::red "FATAL: Could not establish a connection to OpenSearch within ${tries} tries. Exiting..."
 			exit 1
 		fi
 	done
 
-	log::green "OpenSearch connection is available!"
+	log::green "OpenSearch connection established!"
 }
 
 #######################################
@@ -98,6 +101,7 @@ opensearch_connection_check() {
 # Globals:
 #   REDIS_URL
 #   REDIS_TIMEOUT
+#   CONNECTION_TIMEOUT
 # Arguments:
 #   None
 # Outputs:
@@ -113,18 +117,18 @@ redis_connection_check() {
 	redis_port=${REDIS_PORT:-"$(trurl "$REDIS_URL" --get '{port}')"}
 	tries=0
 
-  until timeout "${REDIS_TIMEOUT}" bash -c "cat </dev/tcp/${redis_host}/${redis_port:-6379}" &>/dev/null; do
-		log::yellow "Waiting $((REDIS_TIMEOUT - tries)) more seconds for Redis connection to become available"
+  until nc -z -w"${CONNECTION_TIMEOUT}" -v "${redis_host}" "${redis_port:-6379}" 2>/dev/null; do
+		log::yellow "Will try to establish a Redis connection $((REDIS_TRIES - tries)) more times"
 		sleep 1
 		tries=$((tries + 1))
 
-		if [ "$tries" -eq "${REDIS_TIMEOUT}" ]; then
-			log::red "FATAL: Could not connect to Redis within timeout of ${tries} seconds. Exiting."
+		if [ "$tries" -ge "${REDIS_TRIES}" ]; then
+			log::red "FATAL: Could not establish a connection to Redis within ${tries} tries. Exiting..."
 			exit 1
 		fi
 	done
 
-	log::green "Redis connection is available!"
+	log::green "Redis connection established!"
 }
 
 #######################################
@@ -133,6 +137,7 @@ redis_connection_check() {
 # Globals:
 #   MESSENGER_TRANSPORT_DSN
 #   RABBITMQ_TIMEOUT
+#   CONNECTION_TIMEOUT
 # Arguments:
 #   None
 # Outputs:
@@ -148,16 +153,16 @@ rabbitmq_connection_check() {
 	rabbitmq_port=${RABBITMQ_PORT:-"$(trurl "$MESSENGER_TRANSPORT_DSN" --get '{port}')"}
 	tries=0
 
-  until timeout "${RABBITMQ_TIMEOUT}" bash -c "cat </dev/tcp/${rabbitmq_host}/${rabbitmq_port:-5672}" &>/dev/null; do
-		log::yellow "Waiting $((RABBITMQ_TIMEOUT - tries)) more seconds for RabbitMQ connection to become available"
+  until nc -z -w"${CONNECTION_TIMEOUT}" -v "${rabbitmq_host}" "${rabbitmq_port:-5672}" 2>/dev/null; do
+		log::yellow "Will try to establish a RabbitMQ connection $((RABBITMQ_TRIES - tries)) more times"
 		sleep 1
 		tries=$((tries + 1))
 
-		if [ "$tries" -eq "${RABBITMQ_TIMEOUT}" ]; then
-			log::red "FATAL: Could not connect to RabbitMQ within timeout of ${tries} seconds. Exiting."
+		if [ "$tries" -ge "${RABBITMQ_TRIES}" ]; then
+			log::red "FATAL: Could not establish a connection to RabbitMQ within ${tries} tries. Exiting..."
 			exit 1
 		fi
 	done
 
-	log::green "RabbitMQ connection is available!"
+	log::green "RabbitMQ connection established!"
 }

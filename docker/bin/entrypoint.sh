@@ -3,9 +3,9 @@
 # shellcheck disable=SC1091
 
 set -o errexit
-set -o nounset
 set -o pipefail
-# set -o xtrace # Uncomment this line for debugging purposes
+# Uncomment this line for debugging purposes
+# set -o xtrace
 
 # Load Libraries
 . /opt/adnoctem/lib/libadnoctem.sh
@@ -14,8 +14,6 @@ set -o pipefail
 . /opt/adnoctem/lib/libshopware.sh
 
 print_banner
-
-installed=$(is_shopware_installed)
 
 # MySQL/MariaDB
 if [[ -n "${DATABASE_URL}" ]]; then
@@ -33,14 +31,15 @@ if [[ -n "${REDIS_URL}" ]]; then
 fi
 
 # RabbitMQ
-if [[ -n "${MESSENGER_TRANSPORT_DSN}" ]]; then
+if [[ -n "${MESSENGER_TRANSPORT_DSN:-}" ]]; then
   rabbitmq_connection_check
 fi
 
 
-# if we're trying to run PHP-FPM for Shopware, check if it's even installed
-if [[ $1 == "php-fpm" || ${1#-} != "$1" ]]; then
-  if [[ "$installed" -ne 0 ]]; then
+if [[ ${1#-} != "$1" ]]; then
+  # if we're trying to run PHP-FPM for Shopware, check if it's even installed
+  installed=$(is_shopware_installed)
+  if [[ "$installed" == "false" ]]; then
     log::yellow "Shopware was not found to be installed. Running initial installation"
     shopware_install
   else

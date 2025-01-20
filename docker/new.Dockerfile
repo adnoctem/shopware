@@ -16,6 +16,7 @@ FROM php:$PHP_VERSION-fpm-bookworm AS base
 
 ARG NODE_VERSION
 ARG APP_ENV
+USER root
 
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
 VOLUME ["/var/www/html"]
@@ -202,12 +203,10 @@ RUN set -eux; \
 RUN set -eux; \
     apt-get update; \
 	  apt-get install -y --no-install-recommends  \
-      curl; \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives; \
+      netcat-openbsd curl libcurl4-openssl-dev; \
     # Shopware CLI - see: https://sw-cli.fos.gg/install/
     curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash; \
     apt-get install -y --no-install-recommends shopware-cli; \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives; \
     cd /tmp ; \
     # Node + npm/npx - see: https://nodejs.org/dist/
     curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz; \
@@ -235,8 +234,8 @@ RUN set -eux; \
     php -r "unlink('composer-setup.php');"; \
     mv composer.phar /usr/local/bin/composer; \
     cd /tmp; \
-    # remove installation-depedencies
-    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl; \
+    # remove installation-dependencies
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl libcurl4-openssl-dev; \
     rm -rf /tmp/* /var/lib/apt/lists/* /var/cache/apt/archives
 
 ENV PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH" \
@@ -281,7 +280,7 @@ FROM base AS builder
 ARG BUILD_CMD
 
 # link files for build
-COPY --link --chmod=740 . .
+COPY --link --chown=1001 --chmod=750 . .
 RUN --mount=type=cache,target=/tmp/composer/cache \
     --mount=type=cache,target=/tmp/npm/cache \
     --mount=type=secret,id=composer_auth,target=/var/www/html/auth.json \
@@ -304,7 +303,7 @@ COPY --chmod=755 docker/lib/lib*.sh /opt/adnoctem/lib
 COPY --chmod=755 docker/bin/entrypoint.sh /opt/adnoctem/bin
 
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
-    chmod u+rwX -R /var/www/html
+    chmod g+rwX -R /var/www/html
 
 # ref: https://unix.stackexchange.com/questions/556748/how-to-check-whether-a-socket-is-listening-or-not
 HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
@@ -339,7 +338,7 @@ RUN set -eux; \
       "shopware-cli" \
       #"perl" \
       "gpg" \
-      "sed" \
+      # "sed" \
       #"xz-utils" \
       "grep" \
       #"gzip" \

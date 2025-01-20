@@ -211,13 +211,14 @@ remove_storefront_config() {
 # Arguments:
 #   None
 # Outputs:
-#   0 if it is installed, 1 otherwise.
+#   The string "true" if it is installed,
+#   "false" otherwise.
 #######################################
 is_shopware_installed() {
-  if pc system:is-installed; then
-    return 0
+  if pc system:is-installed &>/dev/null; then
+    echo "true"
   else
-    return 1
+    echo "false"
   fi
 }
 
