@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopware-config
+  namespace: shopware
+data:
+  # General settings
+  APP_ENV: "prod"
+  APP_URL: "https://shopware.internal"
+  APP_URL_CHECK_DISABLED: "1"
+  BLUE_GREEN_DEPLOYMENT: "0"
+  SHOPWARE_CACHE_ID: "sw"
+  SHOPWARE_SKIP_WEBINSTALLER: "1"
+  SQL_SET_DEFAULT_SESSION_VARIABLES: "0"
+  LOCK_DSN: "flock"
+  # MySQL
+  DATABASE_HOST: "shopware-mysql-haproxy.shopware.svc.cluster.local"
+  DATABASE_PORT: "3306"
+  DATABASE_NAME: "shopware"
+  # Redis
+  REDIS_HOST: "shopware-redis-master"
+  REDIS_PORT: "6379"
+  # Messenger
+  MESSENGER_HOST: "shopware-rabbitmq.shopware.svc.cluster.local"
+  MESSENGER_PORT: "5672"
+  MESSENGER_PATH: "/%2f/messages"
+  MESSENGER_QUERY_PARAMS: "?auto_setup=false"
+  # S3
+  S3_PUBLIC_BUCKET: "shop6-staging-public"
+  S3_PRIVATE_BUCKET: "shop6-staging-private"
+  S3_REGION: "auto"
+  S3_CDN_URL: "https://assets.shop.delta4x4.dev"
+  S3_USE_PATH_STYLE_ENDPOINT: "true"
+  # OpenSearch
+  OPENSEARCH_PROTOCOL: "https"
+  OPENSEARCH_HOST: "shopware-opensearch" # required due to TLS SANs
+  OPENSEARCH_PORT: "9200"
+  # SMTP
+  # MAILER_HOST: "mail.delta4x4.net"
+  # MAILER_PORT: "25"
+  MAILER_DSN: "null://null"
+  # HTTP caching settings
+  SHOPWARE_HTTP_CACHE_ENABLED: "0"
+  SHOPWARE_HTTP_DEFAULT_TTL: "7200"
+  STOREFRONT_PROXY_URL: "https://shopware.internal"
+  # ElasticSearch/OpenSearch settings
+  SHOPWARE_ES_ENABLED: "1"
+  SHOPWARE_ES_INDEXING_ENABLED: "1"
+  SHOPWARE_ES_INDEX_PREFIX: "sw"
+  SHOPWARE_ES_THROW_EXCEPTION: "1"
+  SHOPWARE_ES_SSL_VERIFY: "false"
+  # OpenTelemetry settings
+  OTEL_PHP_AUTOLOAD_ENABLED: "true"
+  # OTEL_PHP_DISABLED_INSTRUMENTATIONS: ""
+  OTEL_SERVICE_NAME: "shopware"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://shopware-otel-collector.shopware.svc.cluster.local:4317"
+  # Shopware Deployment Helper (or our installation script)
+  INSTALL_LOCALE: "de-DE"
+  INSTALL_CURRENCY: "EUR"
+  SALES_CHANNEL_NAME: "Storefront"
+  SALES_CHANNEL_URL: "https://shopware.internal"
+  SALES_CHANNEL_THEME: "Storefront"

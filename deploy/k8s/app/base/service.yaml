@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shopware
+  namespace: shopware
+spec:
+  selector:
+    app.kubernetes.io/component: shop
+    app.kubernetes.io/name: shopware
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9000
+      targetPort: 8000

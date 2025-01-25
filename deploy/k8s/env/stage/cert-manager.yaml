@@ -1,0 +1,13 @@
+global:
+  leaderElection:
+    namespace: cert-manager
+
+crds:
+  enabled: true
+  keep: true
+
+startupapicheck:
+  timeout: 5m
+
+ingressShim:
+  defaultIssuerKind: ClusterIssuer

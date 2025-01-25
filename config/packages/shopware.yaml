@@ -16,3 +16,35 @@ shopware:
   admin_worker:
     # The admin worker should be disabled on server, as we're spawning separate PHP CLI workers
     enable_admin_worker: false
+    enable_notification_worker: false
+    enable_queue_stats_worker: false
+
+  # ref: https://github.com/shopwareLabs/example-docker-repository/blob/main/config/packages/docker.yaml
+  mail:
+    update_mail_variables_on_send: false
+  increment:
+    user_activity:
+      type: 'array'
+    message_queue:
+      type: 'array'
+
+when@prod:
+  monolog:
+    handlers:
+      main:
+        type: fingers_crossed
+        action_level: error
+        handler: nested
+        excluded_http_codes: [ 404, 405 ]
+        buffer_size: 50 # How many messages should be saved? Prevent memory leaks
+      nested:
+        type: stream
+        path: php://stderr
+        level: error
+        formatter: monolog.formatter.json
+      console:
+        type: console
+        process_psr_3_messages: false
+        channels: [ "!event", "!doctrine" ]
+      business_event_handler_buffer:
+        level: error

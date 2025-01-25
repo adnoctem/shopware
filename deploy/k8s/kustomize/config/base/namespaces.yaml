@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    name: cert-manager
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-prometheus-stack
+  labels:
+    name: kube-prometheus-stack
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metrics-server
+  labels:
+    name: metrics-server
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opentelemetry-operator
+  labels:
+    name: opentelemetry-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eck-operator
+  labels:
+    name: eck-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pxc-operator
+  labels:
+    name: pxc-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opensearch-operator
+  labels:
+    name: opensearch-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shopware
+  labels:
+    name: shopware

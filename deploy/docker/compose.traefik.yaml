@@ -1,0 +1,64 @@
+services:
+  traefik:
+    image: traefik:v3.0.4
+    container_name: traefik
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "../../secrets/ssl:/etc/traefik/ssl"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - public
+    labels:
+      - "application=traefik"
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=http,https"
+      - "traefik.http.routers.traefik.tls.domains[0].main=traefik.shopware.internal"
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.traefik.shopware.internal"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.shopware.internal`)"
+    configs:
+      - source: traefik.yml
+        target: /etc/traefik/traefik.yml
+      - source: traefik-dynamic.yml
+        target: /etc/traefik/traefik-dynamic.yml
+    security_opt:
+      - no-new-privileges:true
+
+  nginx:
+    image: adnoctem/shopware:0.0.1-nginx
+    container_name: nginx
+    restart: always
+    environment:
+      PORT: 8000
+      HOSTNAME: shopware.internal
+      SOCKET_PATH: /run/php/php-fpm.sock
+    ports:
+      - "8000"
+    volumes:
+      - sw-fpm-sock:/run/php:rw
+    networks:
+      - public
+      - internal
+    labels:
+      - "application=nginx"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.nginx.entrypoints=https"
+      - "traefik.http.routers.nginx.tls=true"
+      - "traefik.http.routers.nginx.tls.domains[0].main=shopware.internal"
+      #- "traefik.http.routers.shopware.tls.domains[0].sans=*.shopware.internal"
+      - "traefik.http.routers.nginx.rule=Host(`shopware.internal`)"
+      - "traefik.http.routers.nginx.service=nginx"
+      - "traefik.http.services.nginx.loadbalancer.server.port=8000"
+      - "traefik.http.services.nginx.loadbalancer.sticky=true"
+      - "traefik.http.services.nginx.loadbalancer.sticky.cookie=true"
+
+configs:
+  traefik.yml:
+    file: conf/traefik.yml
+  traefik-dynamic.yml:
+    file: conf/traefik-dynamic.yml

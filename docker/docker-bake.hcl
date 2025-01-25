@@ -1,17 +1,13 @@
 # ==== Variables ====
-# require setting a version
+# setting a version is mandatory
+# ref: https://docs.docker.com/build/bake/variables/#validating-variables
 variable "VERSION" {
   default = null
-}
 
-# use 'latest' if no other TAGS are passed in
-variable "TAGS" {
-  default = "latest"
-}
-
-# targets to build
-variable "TARGETS" {
-  default = "dev,prod"
+  validation {
+    condition     = VERSION != ""
+    error_message = "Must set 'VERSION' to bake images for ${REPO}"
+  }
 }
 
 # determine (custom) image registries
@@ -21,26 +17,27 @@ variable "REGISTRIES" {
 
 # lock the image repository
 variable "REPO" {
-  default = "fmjstudios/shopware"
+  default = "adnoctem/shopware"
 }
 
 # set a default version
-variable "DEFAULT_PHP" {
+variable "PHP" {
   default = "8.3"
 }
 
 variable "PHP_VERSIONS" {
-  default = "8.2,${DEFAULT_PHP}"
+  default = "8.2,${PHP}"
 }
 
-# ==== Environment Variables ====
-variable "SHOPWARE_S3_BUCKET" {}
-variable "SHOPWARE_S3_REGION" {}
-variable "SHOPWARE_S3_ACCESS_KEY" {}
-variable "SHOPWARE_S3_SECRET_KEY" {}
-variable "SHOPWARE_S3_ENDPOINT" {}
-variable "SHOPWARE_S3_CDN_URL" {}
-variable "SHOPWARE_S3_USE_PATH_ENDPOINT" {}
+# set a default node version
+variable "NODE" {
+  default = "20.18.2"
+}
+
+variable "NODE_VERSIONS" {
+  default = "${NODE}"
+  # default = "${NODE},22.13.1"
+}
 
 
 # ==== Custom Functions ====
@@ -50,34 +47,23 @@ function "get_registry" {
   result = flatten(split(",", REGISTRIES))
 }
 
-# determine in which we're going to append for the image
-function "get_target" {
-  params = []
-  result = flatten(split(",", TARGETS))
-}
-
 # OpenContainers labels
 # ref: https://github.com/opencontainers/image-spec/blob/main/annotations.md
 function "labels" {
   params = []
   result = {
-    "org.opencontainers.image.base.name"     = "fmjstudios/shopware:latest"
+    "org.opencontainers.image.base.name"     = "adnoctem/shopware:latest"
     "org.opencontainers.image.created"       = "${timestamp()}"
-    "org.opencontainers.image.description"   = "Shopware - packaged by FMJ Studios"
-    "org.opencontainers.image.documentation" = "https://github.com/fmjstudios/shopware"
+    "org.opencontainers.image.description"   = "Shopware - packaged by Ad Noctem Collective"
+    "org.opencontainers.image.documentation" = "https://github.com/adnoctem/shopware"
     "org.opencontainers.image.licenses"      = "MIT"
-    "org.opencontainers.image.url"           = "https://hub.docker.com/r/fmjstudios/shopware"
-    "org.opencontainers.image.source"        = "https://github.com/fmjstudios/shopware"
+    "org.opencontainers.image.url"           = "https://hub.docker.com/r/adnoctem/shopware"
+    "org.opencontainers.image.source"        = "https://github.com/adnoctem/shopware"
     "org.opencontainers.image.title"         = "shopware"
-    "org.opencontainers.image.vendor"        = "FMJ Studios"
-    "org.opencontainers.image.authors"       = "info@fmj.studio"
-    "org.opencontainers.image.version"       = VERSION == null ? "dev-${timestamp()}" : VERSION
+    "org.opencontainers.image.vendor"        = "Ad Noctem Collective"
+    "org.opencontainers.image.authors"       = "info@adnoctem.co"
+    "org.opencontainers.image.version"       = VERSION
   }
-}
-
-function "get_target" {
-  params = []
-  result = flatten(split(",", TARGETS))
 }
 
 function "get_php_version" {
@@ -85,33 +71,97 @@ function "get_php_version" {
   result = flatten(split(",", PHP_VERSIONS))
 }
 
-function "tags" {
+function "get_node_version" {
+  params = []
+  result = flatten(split(",", NODE_VERSIONS))
+}
+
+# Build base tags for suffix and append to for the various other images, versions and configurations
+# These images already include all external registries we'd like to push to
+function "base_tags" {
+  params = []
+  result = flatten(
+    concat([
+      "${REPO}:latest",
+      "${REPO}:${VERSION}"
+    ],
+      [
+        for reg in get_registry() : [
+        "${reg}/${REPO}:latest",
+        "${reg}/${REPO}:${VERSION}"
+      ]
+      ])
+  )
+}
+
+# Build image tags for the Shopware application images
+function "app_tags" {
   params = [
     suffix,
-    target
+    php,
+    node
   ]
   result = flatten([
-    [
-      for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
-      flatten([
-          tag == "latest" ? "${REPO}:${tag}" : "",
-          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${REPO}:${tag}${suffix}-${target}" : "",
-          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${REPO}:${tag}${suffix}" : "",
-          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${REPO}:${tag}" : "",
-      ])
-    ],
-    [
-      for rgs in get_registry() : [
-      for tag in VERSION == null ? flatten(split(",", TAGS)) : concat(flatten(split(",", TAGS)), [VERSION]) :
-      flatten([
-          tag == "latest" ? "${rgs}/${REPO}:${tag}" : "",
-          tag != "latest" && suffix != "-fcgi" && target != "prod" ? "${rgs}/${REPO}:${tag}${suffix}-${target}" : "",
-          tag != "latest" && suffix != "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}${suffix}" : "",
-          tag != "latest" && suffix == "-fcgi" && target == "prod" ? "${rgs}/${REPO}:${tag}" : "",
-      ])
-    ]
+    for tg in base_tags() : [
+        php != "${PHP}" && node != "${NODE}" ? "${tg}-${php}-node${substr(node,0,2)}${suffix}" : "",
+        php != "${PHP}" && node == "${NODE}" ? "${tg}-${php}${suffix}" : "",
+        php == "${PHP}" && node != "${NODE}" ? "${tg}-node${substr(node,0,2)}${suffix}" : "",
+        php == "${PHP}" && node == "${NODE}" ? "${tg}${suffix}" : "",
     ]
   ])
+}
+
+# Build the image tags for external applications for the repository 'adnoctem/shopware'
+# NOTE: do not create tags like `latest-nginx`
+function "external_tags" {
+  params = [
+    suffix
+  ]
+  result = flatten([
+    for tag in setsubtract(
+      base_tags(), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]
+    ) : [
+      "${tag}${suffix}"
+    ]
+  ])
+}
+
+# Base configuration to inherit from
+target "base" {
+  args = {
+    VERSION = VERSION
+  }
+  platforms = [
+    "linux/amd64",
+    # uncomment if required
+    # "linux/arm64",
+    # "linux/arm/v7",
+    # "linux/arm/v6",
+    # "linux/riscv64",
+    # "linux/s390x",
+    # "linux/386",
+    # "linux/ppc64le"
+  ]
+  secret = [
+    # DSNs/URLs
+    "type=env,id=DATABASE_URL",
+    "type=env,id=OPENSEARCH_URL",
+    "type=env,id=REDIS_URL",
+    "type=env,id=MESSENGER_TRANSPORT_DSN",
+    "type=env,id=MAILER_DSN",
+    "type=env,id=LOCK_DSN",
+    # S3
+    "type=env,id=S3_PUBLIC_BUCKET",
+    "type=env,id=S3_PRIVATE_BUCKET",
+    "type=env,id=S3_REGION",
+    "type=env,id=S3_ACCESS_KEY",
+    "type=env,id=S3_SECRET_KEY",
+    "type=env,id=S3_ENDPOINT",
+    "type=env,id=S3_CDN_URL",
+    "type=env,id=S3_USE_PATH_STYLE_ENDPOINT",
+  ]
+  labels = labels()
+  output = ["type=docker"]
 }
 
 # ==== Bake Groups ====
@@ -120,133 +170,95 @@ group "default" {
 }
 
 group "nginx" {
-  targets = ["shopware-nginx"]
+  targets = ["nginx"]
 }
 
-# group "caddy" {
-#   targets = ["shopware-caddy"]
+group "dev" {
+  targets = ["shopware-dev"]
+}
+
+# group "aio" {
+#   targets = ["shopware-aio"]
 # }
 
 group "all" {
-  targets = ["shopware", "shopware-nginx"]
+  targets = ["shopware", "shopware-dev", "nginx"]
 }
 
 # ==== Bake Targets ====
-# The (base) application image
 target "shopware" {
-  name       = "shopware-php${replace(php, ".", "-")}-${tgt}"
+  name       = "shopware-php${replace(php, ".", "-")}-node${substr(node,0,2)}"
   dockerfile = "Dockerfile"
+  inherits = ["base"]
   matrix = {
     php = get_php_version()
-    tgt = get_target()
+    node = get_node_version()
   }
   args = {
-    PHP_VERSION = php
+    PHP_VERSION  = php
+    NODE_VERSION = node
+    APP_ENV      = "prod"
+    BUILD_CMD    = "shopware-cli project ci ."
   }
-  platforms = [
-    "linux/amd64",
-    # uncomment if required
-    # "linux/arm64",
-    # "linux/arm/v7",
-    # "linux/arm/v6",
-    # "linux/riscv64",
-    # "linux/s390x",
-    # "linux/386",
-    # "linux/ppc64le"
-  ]
-  secret = [
-    "type=env,id=SHOPWARE_S3_BUCKET",
-    "type=env,id=SHOPWARE_S3_REGION",
-    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
-    "type=env,id=SHOPWARE_S3_SECRET_KEY",
-    "type=env,id=SHOPWARE_S3_ENDPOINT",
-    "type=env,id=SHOPWARE_S3_CDN_URL",
-    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
-  ]
-  target = tgt
-  tags = tags(
-    "-fcgi",
-    tgt
+  tags = app_tags(
+    "",
+    "${php}",
+    "${node}"
   )
-  labels = labels()
-  output = ["type=docker"]
+  secret = [
+    "type=file,id=composer_auth,src=auth.json"
+  ]
 }
 
-# The Nginx application image
-target "shopware-nginx" {
-  name       = "shopware-nginx-php${replace(php, ".", "-")}-${tgt}"
+target "shopware-dev" {
+  name       = "shopware-php${replace(php, ".", "-")}-node${substr(node,0,2)}-dev"
+  dockerfile = "Dockerfile"
+  inherits = ["base"]
+  matrix = {
+    php = get_php_version()
+    node = get_node_version()
+  }
+  args = {
+    PHP_VERSION  = php
+    NODE_VERSION = node
+    APP_ENV      = "dev"
+    BUILD_CMD    = "shopware-cli project ci --with-dev-dependencies ."
+  }
+  tags = app_tags(
+    "-dev",
+    "${php}",
+    "${node}"
+  )
+  secret = [
+    "type=file,id=composer_auth,src=auth.json"
+  ]
+}
+
+# The AIO (all-in-one) application image
+# target "shopware-aio" {
+#   name       = "shopware-aio-${tgt}"
+#   dockerfile = "docker/aio.Dockerfile"
+#   inherits = ["base"]
+#   matrix = {
+#     tgt = get_target()
+#   }
+#   contexts = {
+#     base = "docker-image://adnoctem/shopware:${VERSION}"
+#   }
+#   tags = external_tags("-aio")
+# }
+
+# A custom Shopware-focused Nginx image
+target "nginx" {
+  # name       = "nginx"
   dockerfile = "docker/nginx.Dockerfile"
-  contexts = {
-    base = "docker-image://fmjstudios/shopware:latest"
-  }
-  matrix = {
-    php = get_php_version()
-    tgt = get_target()
-  }
-  args = {
-    PHP_VERSION = php
-  }
-  platforms = [
-    "linux/amd64",
-    # uncomment if required
-    # "linux/arm64",
-    # "linux/arm/v7",
-    # "linux/arm/v6",
-    # "linux/riscv64",
-    # "linux/s390x",
-    # "linux/386",
-    # "linux/ppc64le"
-  ]
-  secret = [
-    "type=env,id=SHOPWARE_S3_BUCKET",
-    "type=env,id=SHOPWARE_S3_REGION",
-    "type=env,id=SHOPWARE_S3_ACCESS_KEY",
-    "type=env,id=SHOPWARE_S3_SECRET_KEY",
-    "type=env,id=SHOPWARE_S3_ENDPOINT",
-    "type=env,id=SHOPWARE_S3_CDN_URL",
-    "type=env,id=SHOPWARE_S3_USE_PATH_ENDPOINT",
-  ]
-  tags = tags(
-    "-nginx",
-    tgt
-  )
-  labels = labels()
-  output = ["type=docker"]
+  tags = external_tags("-nginx")
 }
 
-# NOTE: The image using Caddy as the web server is deprecated, due to the DoS possibility with Caddy's
+
+# NOTE: The image using Caddy as the web server is discouraged, due to the DoS possibility with Caddy's
 # 'Transfer-Encoding' HTTP header. Until further notice we'll only provide an Nginx image.
 # ref: https://github.com/shopware/docker/issues/107
 #
 # The Caddy application image
-# target "shopware-caddy" {
-#   name       = "shopware-caddy-php${replace(php, ".", "-")}"
-#   dockerfile = "docker/caddy.Dockerfile"
-#   contexts = {
-#     base = "docker-image://fmjstudios/shopware:latest"
-#   }
-#   matrix = {
-#     php = get_php_version()
-#     tgt = get_target()
-#   }
-#   args = {
-#     PHP_VERSION = php
-#   }
-#   platforms = [
-#     "linux/amd64",
-#     # uncomment if required
-#     # "linux/arm64",
-#     # "linux/arm/v7",
-#     # "linux/arm/v6",
-#     # "linux/riscv64",
-#     # "linux/s390x",
-#     # "linux/386",
-#     # "linux/ppc64le"
-#   ]
-#   tags = tags(
-#     "-caddy",
-#     tgt
-#   )
-#   labels = labels()
-#   output = ["type=docker"]
-# }
+# target "shopware-caddy" { }

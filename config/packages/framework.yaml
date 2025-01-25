@@ -1,8 +1,9 @@
 # config/packages/framework.yaml
 framework:
-  # caching
+  # use Redis for HTTP caching
+  # ref: https://developer.shopware.com/docs/guides/hosting/performance/caches.html#example-replace-some-cache-with-redis
   cache:
-    default_redis_provider: "%env(string:SHOPWARE_REDIS_URL)%"
+    default_redis_provider: "%env(string:REDIS_URL)%"
     pools:
       cache.http:
         adapter: cache.adapter.redis_tag_aware
@@ -19,3 +20,7 @@ framework:
       "x-forwarded-port",
       "x-forwarded-prefix",
     ]
+
+  # ref: https://developer.shopware.com/docs/guides/hosting/performance/performance-tweaks.html#disable-symfony-secrets
+  secrets:
+    enabled: false

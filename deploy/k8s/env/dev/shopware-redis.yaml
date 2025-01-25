@@ -1,0 +1,10 @@
+metrics:
+  enabled: true
+
+architecture: standalone
+auth:
+  enabled: true
+  sentinel: false
+  existingSecret: shopware-redis-credentials
+  existingSecretPasswordKey: password
+  usePasswordFiles: true

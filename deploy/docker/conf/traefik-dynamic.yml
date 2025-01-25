@@ -1,0 +1,12 @@
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/ssl/server.pem
+        keyFile: /etc/traefik/ssl/server-key.pem
+
+  certificates:
+    - certFile: /etc/traefik/ssl/server.pem
+      keyFile: /etc/traefik/ssl/server-key.pem
+      stores:
+        - default

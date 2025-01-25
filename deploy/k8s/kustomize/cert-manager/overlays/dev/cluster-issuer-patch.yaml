@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ca-development-issuer
+  namespace: cert-manager
+  labels:
+    fmj.dev/env: dev
+    fmj.dev/component: cert-manager
+spec:
+  $patch: replace
+  ca:
+    secretName: root-ca

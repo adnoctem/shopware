@@ -1,0 +1,34 @@
+# lock defaults
+crds:
+  enabled: true
+
+alertmanager:
+  ingress:
+    enabled: false
+
+grafana:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: zerossl-staging-issuer
+    hosts:
+      - grafana.delta4x4.dev
+    path: /
+    tls:
+      - secretName: grafana-ingress-tls
+        hosts:
+          - grafana.delta4x4.dev
+
+prometheus:
+  ingress:
+    enabled: false
+    annotations:
+      cert-manager.io/cluster-issuer: zerossl-staging-issuer
+    hosts:
+      - prometheus.delta4x4.dev
+    paths:
+      - /
+    tls:
+      - secretName: prometheus-ingress-tls
+        hosts:
+          - prometheus.delta4x4.dev

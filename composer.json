@@ -1,12 +1,16 @@
 {
-  "name": "fmjstudios/shopware",
-  "description": "The FMJ Studios build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3.",
+  "name": "adnoctem/shopware",
+  "description": "The Ad Noctem build of Shopware 6 - an open headless commerce platform powered by Symfony 7 and Vue.js 3",
   "license": "MIT",
   "type": "project",
   "require": {
     "php": ">=8.2 <8.4",
+    "ext-redis": "*",
+    "ext-apcu": "*",
     "ext-grpc": "*",
     "ext-opentelemetry": "*",
+    "ext-zstd": "*",
+    "ext-amqp": "*",
     "composer-runtime-api": "^2.0",
     "frosh/tools": "^2.3",
     "league/flysystem-async-aws-s3": "^3.29",
@@ -20,31 +24,36 @@
     "shopware/storefront": "^6.6",
     "swag/language-pack": "^4.17",
     "swag/paypal": "^9.6",
+    "symfony/amqp-messenger": "^7.2",
     "symfony/flex": "^2.4"
   },
-  "repositories": [
-    {
+  "repositories": {
+    "shopware-packages": {
+      "type": "composer",
+      "url": "https://packages.shopware.com"
+    },
+    "plugins": {
       "type": "path",
       "url": "custom/plugins/*",
       "options": {
         "symlink": true
       }
     },
-    {
+    "plugins-packages": {
       "type": "path",
       "url": "custom/plugins/*/packages/*",
       "options": {
         "symlink": true
       }
     },
-    {
+    "static-plugins": {
       "type": "path",
       "url": "custom/static-plugins/*",
       "options": {
         "symlink": true
       }
     }
-  ],
+  },
   "minimum-stability": "stable",
   "prefer-stable": true,
   "config": {
@@ -55,6 +64,7 @@
       "tbachert/spi": true
     },
     "optimize-autoloader": true,
+    "classmap-authoritative": true,
     "sort-packages": true
   },
   "scripts-descriptions": {

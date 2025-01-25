@@ -1,0 +1,137 @@
+services:
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    ports:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    restart: unless-stopped
+    environment:
+      GF_INSTALL_PLUGINS: grafana-opensearch-datasource
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: true
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_SERVER_ROOT_URL: "https://grafana.shopware.internal"
+    networks:
+      - public
+      - internal # tempo, otel-c access
+    configs:
+      - source: grafana-datasources.yaml
+        target: /etc/grafana/provisioning/datasources/datasources.yaml
+    labels:
+      - "application=grafana"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.grafana.entrypoints=https"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.domains[0].main=grafana.shopware.internal"
+      - "traefik.http.routers.grafana.tls.domains[0].sans=*.grafana.shopware.internal"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.shopware.internal`)"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  # Tempo runs as user 10001, and docker compose creates the volume as root.
+  # As such, we need to chown the volume in order for Tempo to start correctly.
+  tempo-init:
+    image: grafana/tempo:latest
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - tempo-data:/var/tempo
+    labels:
+      - "application=tempo-init"
+      - "traefik.enable=true"
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - tempo-data:/var/tempo
+    ports:
+      - "14268" # jaeger ingest
+      - "3200" # tempo
+      - "4317" # otlp grpc
+      - "4318" # otlp http
+      - "9411" # zipkin
+    configs:
+      - source: tempo.yaml
+        target: /etc/tempo.yaml
+    networks:
+      - internal
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
+    labels:
+      - "application=tempo"
+      - "traefik.enable=false"
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    configs:
+      - source: prometheus.yaml
+        target: /etc/prometheus.yaml
+    ports:
+      - "9090"
+    networks:
+      - public
+      - internal # otel-c access
+    labels:
+      - "application=prometheus"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.prometheus.entrypoints=https"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.domains[0].main=prometheus.shopware.internal"
+      - "traefik.http.routers.prometheus.tls.domains[0].sans=*.prometheus.shopware.internal"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.shopware.internal`)"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # ref: https://github.com/grafana/tempo/blob/main/example/docker-compose/otel-collector/docker-compose.yaml
+  otel-collector:
+    image: otel/opentelemetry-collector:0.117.0
+    container_name: otel-collector
+    restart: always
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    configs:
+      - source: otel-collector-config.yaml
+        target: /etc/otel-collector.yaml
+    ports:
+      - "4317" # OTLP gRPC receiver
+    networks:
+      - internal
+    depends_on:
+      grafana:
+        condition: service_started
+      tempo:
+        condition: service_started
+    labels:
+      - "application=otel-collector"
+      - "traefik.enable=false"
+
+configs:
+  grafana-datasources.yaml:
+    file: conf/grafana-datasources.yaml
+  tempo.yaml:
+    file: conf/tempo.yaml
+  prometheus.yaml:
+    file: conf/prometheus.yaml
+  otel-collector-config.yaml:
+    file: conf/otel-collector-config.yaml
