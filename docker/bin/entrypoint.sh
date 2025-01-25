@@ -13,6 +13,9 @@ set -o pipefail
 . /opt/adnoctem/lib/libcheck.sh
 . /opt/adnoctem/lib/libshopware.sh
 
+# Load env
+. /opt/adnoctem/conf/env.sh
+
 print_banner
 
 # MySQL/MariaDB
@@ -31,27 +34,36 @@ if [[ -n "${REDIS_URL}" ]]; then
 fi
 
 # RabbitMQ
-if [[ -n "${MESSENGER_TRANSPORT_DSN:-}" ]]; then
+if [[ -n "${MESSENGER_TRANSPORT_DSN}" ]]; then
   rabbitmq_connection_check
 fi
 
-
-if [[ ${1#-} != "$1" ]]; then
-  # if we're trying to run PHP-FPM for Shopware, check if it's even installed
+# to be run in e.g. a Kubernetes initContainer
+if [[ $1 == "setup" ]]; then
+  log::green "Running Shopware 6 setup"
+  # check if we even need a fresh installation, run deployment helper otherwise
   installed=$(is_shopware_installed)
-  if [[ "$installed" == "false" ]]; then
-    log::yellow "Shopware was not found to be installed. Running initial installation"
-    shopware_install
-  else
-    log::yellow "Shopware is installed. Running deployment helper to sync installation"
+  if [[ "$installed" == "true" ]]; then
+    log::green "Shopware is installed. Running deployment helper to sync installation"
+    # manually ensure messenger transports are set up since Deployment Helper fails to do so (23.01.25), regardless
+    # of the Shopware documentation..
+    # ref: https://developer.shopware.com/docs/guides/hosting/performance/performance-tweaks.html#disable-auto-setup
+    shopware_setup_transports
     run_deployment_helper
+  else
+    log::green "Shopware was not found to be installed. Running initial installation"
+    shopware_setup_transports
+    shopware_install
+    exit $?
   fi
+fi
 
+# first argument is a flag (e.g. -F)
+if [[ ${1#-} != "$1" ]]; then
   set -- php-fpm "$@"
-elif [[ $1 == "message-worker" ]]; then
-  run_message_worker
-elif [[ $1 == "cron-worker" ]]; then
-  run_cron_worker
+# run a message or cron worker
+elif [[ $1 == "bin/console" ]]; then
+  set -- php "$@"
 fi
 
 exec "$@"

@@ -2,6 +2,8 @@
 # We toggled the updater with `shopware.auto_update.enabled = false`
 
 shopware:
+  # S3 configuration
+  #
   # Public files: product images, thumbnails, category images, etc.
   filesystem:
     public:
@@ -72,6 +74,31 @@ shopware:
           credentials:
             key: "%env(S3_ACCESS_KEY)%"
             secret: "%env(S3_SECRET_KEY)%"
+
+  # Redis Configuration
+  # ref: https://developer.shopware.com/docs/guides/hosting/infrastructure/redis.html
+  redis:
+    connections:
+      # db 0 are PHP sessions
+      ephemeral:
+        dsn: "%env(REDIS_URL)%/1"
+      persistent:
+        dsn: "%env(REDIS_URL)%/2?persistent=1"
+
+  # ref: https://developer.shopware.com/docs/guides/hosting/performance/performance-tweaks.html#using-zstd-instead-of-gzip-for-compression
+  cart:
+    compress: true
+    compression_method: zstd
+    # use Redis for cart storage (see tab 'Since 6.6.8.0')
+    # ref: https://developer.shopware.com/docs/guides/hosting/performance/cart-storage.html
+    storage:
+      type: redis
+      config:
+        connection: persistent
+
+  cache:
+    cache_compression: true
+    cache_compression_method: zstd
 
   api:
     # Configure rate-limiting for all admin-facing endpoints

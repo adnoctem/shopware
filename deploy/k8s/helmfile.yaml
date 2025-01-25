@@ -1,0 +1,265 @@
+---
+{{- $repoDir := exec "git" (list "rev-parse" "--show-toplevel") | trim }}
+{{- $envDir := (print $repoDir "/deploy/k8s/env") }}
+
+helmDefaults:
+  atomic: true
+  cleanupOnFail: true
+  # this has to be 'false' since kube-prometheus-stack doesn't provide provenance files, so verification will always fail
+  verify: false
+  wait: true
+  waitForJobs: true
+  recreatePods: false
+  createNamespace: true
+
+bases:
+  - {{ $envDir }}/repositories.yaml
+  - {{ $envDir }}/environments.yaml
+
+releases:
+  # ------------------------------
+  # Core Releases
+  # ------------------------------
+
+  # ref: https://helmfile.readthedocs.io/en/latest/advanced-features/#deploy-kustomizations-with-helmfile
+  - chart: kustomize/config/overlays/{{ .Environment.Name }}
+    name: config
+    installed: true
+    labels:
+      app: cluster-config
+      release: config
+      group: core
+
+  # ref: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+  - chart: ingress-nginx/ingress-nginx
+    name: ingress-nginx
+    namespace: ingress-nginx
+    version: 4.11.3
+    installed: true
+    labels:
+      app: ingress-nginx
+      release: ingress-nginx
+      group: core
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/ingress-nginx.yaml
+
+  # ref: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+  - chart: jetstack/cert-manager
+    name: cert-manager
+    namespace: cert-manager
+    version: 1.16.2
+    installed: true
+    disableValidationOnInstall: true
+    hooks:
+      - events: [ "postsync" ]
+        showlogs: true
+        command: "kubectl"
+        args: [ "apply", "-k", "kustomize/cert-manager/overlays/{{`{{ .Environment.Name }}`}}" ]
+    labels:
+      app: cert-manager
+      release: cert-manager
+      group: core
+    needs:
+      - ingress-nginx/ingress-nginx
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/cert-manager.yaml
+
+  # ------------------------------
+  # Infra Releases
+  # ------------------------------
+
+  # ref: https://artifacthub.io/packages/helm/bitnami/external-dns
+  - chart: bitnami/external-dns
+    name: external-dns
+    namespace: external-dns
+    version: 8.7.0
+    {{- if eq .Environment.Name "dev" }}
+    installed: false
+    {{ else }}
+    installed: true
+    {{- end }}
+    disableValidationOnInstall: true
+    labels:
+      app: external-dns
+      release: external-dns
+      group: infra
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/external-dns.yaml
+
+  # ------------------------------
+  # Monitoring Releases
+  # ------------------------------
+
+  # ref: https://artifacthub.io/packages/helm/metrics-server/metrics-server
+  - chart: metrics-server/metrics-server
+    name: metrics-server
+    namespace: metrics-server
+    version: 3.12.2
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: metrics-server
+      release: metrics-server
+      group: monitoring
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/metrics-server.yaml
+
+  # ref: https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+  - chart: prometheus-community/kube-prometheus-stack
+    name: kube-prometheus-stack
+    namespace: kube-prometheus-stack
+    version: 67.2.0
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: kube-prometheus-stack
+      release: kube-prometheus-stack
+      group: monitoring
+    needs:
+      - ingress-nginx/ingress-nginx
+      - cert-manager/cert-manager
+      - metrics-server/metrics-server
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/kube-prometheus-stack.yaml
+
+  # ------------------------------
+  # Operator Releases
+  # ------------------------------
+
+  # ref: https://artifacthub.io/packages/helm/opentelemetry-helm/opentelemetry-operator
+  - chart: opentelemetry/opentelemetry-operator
+    name: opentelemetry-operator
+    namespace: opentelemetry-operator
+    version: 0.75.1
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: opentelemetry-operator
+      release: opentelemetry-operator
+      group: operators
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/opentelemetry-operator.yaml
+
+  # ref: https://artifacthub.io/packages/helm/elastic/eck-operator
+  - chart: elastic/eck-operator
+    name: eck-operator
+    namespace: eck-operator
+    version: 2.15.0
+    installed: false
+    disableValidationOnInstall: true
+    labels:
+      app: eck-operator
+      release: eck-operator
+      group: operators
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/eck-operator.yaml
+
+  # ref: https://github.com/opensearch-project/opensearch-k8s-operator/tree/main/charts/opensearch-operator
+  - chart: opensearch-operator/opensearch-operator
+    name: opensearch-operator
+    namespace: opensearch-operator
+    version: 2.7.0
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: opensearch-operator
+      release: opensearch-operator
+      group: operators
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/opensearch-operator.yaml
+
+  # ref: https://github.com/percona/percona-helm-charts/tree/main/charts/pxc-operator
+  - chart: percona/pxc-operator
+    name: pxc-operator
+    namespace: pxc-operator
+    version: 1.16.0
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: pxc-operator
+      release: pxc-operator
+      group: operators
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/pxc-operator.yaml
+
+  # ref: https://artifacthub.io/packages/helm/bitnami/rabbitmq-cluster-operator
+  - chart: bitnami/rabbitmq-cluster-operator
+    name: rabbitmq-cluster-operator
+    namespace: rabbitmq-cluster-operator
+    version: 4.4.2
+    installed: true
+    disableValidationOnInstall: true
+    labels:
+      app: rabbitmq-cluster-operator
+      release: rabbitmq-cluster-operator
+      group: operators
+    needs:
+      - cert-manager/cert-manager
+      - kube-prometheus-stack/kube-prometheus-stack
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/rabbitmq-cluster-operator.yaml
+
+  # ------------------------------
+  # Application Releases
+  # ------------------------------
+  - chart: bitnami/redis
+    name: shopware-redis
+    version: 20.6.0
+    installed: true
+    namespace: shopware
+    labels:
+      app: shopware
+      release: shopware-redis
+      group: app
+    values:
+      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/shopware-redis.yaml
+
+  - chart: kustomize/shopware/overlays/{{ .Environment.Name }}
+    name: shopware-infra
+    namespace: shopware
+    hooks:
+      # Give the OpenSearch Operator time to create the cluster (might take up to 10min)
+      - events: [ "postsync" ]
+        showlogs: true
+        command: "sleep"
+        args: [ "360" ]
+      - events: [ "postsync" ]
+        showlogs: true
+        command: "kubectl"
+        args: [ "wait", "--for=condition=ready", "-n", "shopware", "--timeout=240s", "pods/shopware-opensearch-nodes-2" ]
+    installed: true
+    labels:
+      app: shopware
+      release: shopware-infra
+      group: app
+
+  # ref: https://helmfile.readthedocs.io/en/latest/advanced-features/#deploy-kustomizations-with-helmfile
+  - chart: app/overlays/{{ .Environment.Name }}
+    name: shopware
+    namespace: shopware
+    installed: true
+    labels:
+      app: shopware
+      release: shopware
+      group: app
+    needs:
+      - shopware/shopware-redis
+      - shopware/shopware-infra

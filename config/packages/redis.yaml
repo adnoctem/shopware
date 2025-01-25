@@ -2,4 +2,5 @@
 # ref: https://developer.shopware.com/docs/guides/hosting/performance/session.html#configure-redis-using-shopware-configuration
 framework:
   session:
+    # index 1 and 2 are application cache and cart storage respectively see 'shopware.yaml'
     handler_id: "%env(REDIS_URL)%"

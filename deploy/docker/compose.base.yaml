@@ -1,0 +1,187 @@
+services:
+  mysql:
+    image: mysql:${MYSQL_VERSION:-8.0}-oracle
+    container_name: mysql
+    restart: always
+    ports:
+      - "3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shopware}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-shopware}
+      MYSQL_USER: ${MYSQL_USER:-shopware}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shopware}
+    volumes:
+      - db-data:/var/lib/mysql:rw
+    configs:
+      - source: my.cnf
+        target: /etc/mysql/my.cnf
+    networks:
+      - internal
+    labels:
+      - "application=mysql"
+      - "traefik.enable=false"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD:-shopware}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ref: https://hub.docker.com/r/bitnami/redis
+  redis:
+    image: bitnami/redis:6.2
+    container_name: redis
+    restart: always
+    ports:
+      - "6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - redis-data:/bitnami/redis/data
+    networks:
+      - internal
+    labels:
+      - "application=redis"
+      - "traefik.enable=false"
+
+  rabbitmq:
+    image: rabbitmq:4
+    container_name: rabbitmq
+    ports:
+      - "5672"
+      - "15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: shopware
+      RABBITMQ_DEFAULT_PASS: shopware
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - public
+      - internal
+    labels:
+      - "application=rabbitmq"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.rabbitmq.entrypoints=https"
+      - "traefik.http.routers.rabbitmq.tls=true"
+      - "traefik.http.routers.rabbitmq.tls.domains[0].main=rabbitmq.shopware.internal"
+      - "traefik.http.routers.rabbitmq.tls.domains[0].sans=*.rabbitmq.shopware.internal"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.shopware.internal`)"
+      - "traefik.http.routers.rabbitmq.service=rabbitmq"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+
+  # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: opensearch
+    ports:
+      - "9200" # REST API
+      - "9600" # Performance Analyzer
+    environment:
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "AShopware6Password!"
+      discovery.type: single-node
+      plugins.security.disabled: true
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - internal
+    labels:
+      - "application=opensearch"
+      - "traefik.enable=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # ref: https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/#sample-docker-composeyml
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2
+    container_name: opensearch-dashboards
+    ports:
+      - "5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+      opensearch.username: shopware
+      opensearch.password: shopware
+    networks:
+      - public
+      - internal # needs opensearch access
+    labels:
+      - "application=opensearch-dashboards"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.opensearch.entrypoints=https"
+      - "traefik.http.routers.opensearch.tls=true"
+      - "traefik.http.routers.opensearch.tls.domains[0].main=opensearch.shopware.internal"
+      - "traefik.http.routers.opensearch.tls.domains[0].sans=*.opensearch.shopware.internal"
+      - "traefik.http.routers.opensearch.rule=Host(`opensearch.shopware.internal`)"
+      - "traefik.http.routers.opensearch.service=opensearch"
+      - "traefik.http.services.opensearch.loadbalancer.server.port=5601"
+
+  # ref: https://mailpit.axllent.org/docs/configuration/runtime-options/
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    ports:
+      - "1025"
+      - "8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      - public
+    labels:
+      - "application=mailpit"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.mailpit.entrypoints=https"
+      - "traefik.http.routers.mailpit.tls=true"
+      - "traefik.http.routers.mailpit.tls.domains[0].main=mailpit.shopware.internal"
+      - "traefik.http.routers.mailpit.tls.domains[0].sans=*.mailpit.shopware.internal"
+      - "traefik.http.routers.mailpit.rule=Host(`mailpit.shopware.internal`)"
+      - "traefik.http.routers.mailpit.service=mailpit"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+
+  # ref: https://hub.docker.com/_/phpmyadmin
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: phpmyadmin
+    ports:
+      - "8090"
+    environment:
+      APACHE_PORT: 8090
+      MYSQL_ROOT_PASSWORD: shopware
+      PMA_HOST: mysql
+      # PMA_ARBITRARY: 1
+      PMA_ABSOLUTE_URI: https://phpmyadmin.shopware.internal
+    networks:
+      - public
+      - internal # needs mysql access
+    labels:
+      - "application=phpmyadmin"
+      - "traefik.enable=true"
+      - "traefik.docker.network=public"
+      - "traefik.http.routers.phpmyadmin.entrypoints=https"
+      - "traefik.http.routers.phpmyadmin.tls=true"
+      - "traefik.http.routers.phpmyadmin.tls.domains[0].main=phpmyadmin.shopware.internal"
+      - "traefik.http.routers.phpmyadmin.tls.domains[0].sans=*.phpmyadmin.shopware.internal"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.shopware.internal`)"
+      - "traefik.http.routers.phpmyadmin.service=phpmyadmin"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=8090"
+
+configs:
+  my.cnf:
+    file: conf/my.cnf

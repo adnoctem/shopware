@@ -3,11 +3,13 @@ shopware:
   profiler:
     integrations:
       - OpenTelemetry
+
+# not currently working, produces errors like 'Invalid configuration "monolog.handlers.main": can only use excluded_http_codes/excluded_404s with a FingersCrossedHandler definition'
 #monolog:
-#    handlers:
-#        main:
-#            type: service
-#            id: monolog.handler.open_telemetry
-#        elasticsearch:
-#            type: service
-#            id: monolog.handler.open_telemetry
+#  handlers:
+#    main:
+#      type: service
+#      id: monolog.handler.open_telemetry
+#    elasticsearch:
+#      type: service
+#      id: monolog.handler.open_telemetry

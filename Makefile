@@ -134,20 +134,101 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 secretGenerator:
   - name: root-ca
-	type: "kubernetes.io/tls"
-	namespace: cert-manager
-	files:
-	  - tls.crt=ssl/ca.pem
-	  - tls.key=ssl/ca-key.pem
-	options:
-	  disableNameSuffixHash: true
-	  annotations:
-		reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
-  - name: shopware-env-secrets
-	type: Opaque
-	namespace: shopware
-	envs:
-	  - .env.tmp
+    type: "kubernetes.io/tls"
+    namespace: cert-manager
+    files:
+      - tls.crt=ssl/ca.pem
+      - tls.key=ssl/ca-key.pem
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        reflector.v1.k8s.emberstack.com/reflection-allowed: "false"
+  # Admin (e.g. installation) credentials
+  - name: shopware-admin-credentials
+    type: "kubernetes.io/basic-auth"
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - username=swadm
+    files:
+      - password=shopware_admin_password.txt
+  # MySQL
+  # ref: https://docs.percona.com/percona-operator-for-mysql/pxc/users.html#unprivileged-users
+  - name: shopware-mysql-credentials
+    type: "kubernetes.io/basic-auth"
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - username=shopware
+    files:
+      - password=db_password.txt
+  # Redis
+  # ref: https://artifacthub.io/packages/helm/bitnami/redis?modal=values&path=auth.existingSecret
+  - name: shopware-redis-credentials
+    type: "kubernetes.io/basic-auth"
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    files:
+      - password=redis_password.txt
+  # OpenSearch
+  # ref: https://github.com/opensearch-project/opensearch-k8s-operator/blob/main/docs/userguide/main.md
+  - name: shopware-opensearch-credentials
+    type: "kubernetes.io/basic-auth"
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - username=shopware
+    files:
+      - password=opensearch_password.txt
+  # RabbitMQ
+  # ref: https://github.com/rabbitmq/cluster-operator/tree/main/docs/examples/external-admin-secret-credentials
+  - name: shopware-rabbitmq-credentials
+    type: Opaque
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - username=shopware
+      - host=shopware-rabbitmq.shopware.svc.cluster.local
+      - port="5672"
+      - provider=rabbitmq
+      - type=rabbitmq
+    files:
+      - default_user.conf=rabbitmq_default-user-conf.txt
+      - password=rabbitmq_password.txt
+  # S3
+  - name: shopware-s3-credentials
+    type: Opaque
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    files:
+      - access_key=s3_access_key.txt
+      - secret_key=s3_secret_key.txt
+      - endpoint=s3_endpoint.txt
+  # SMTP
+  # - name: shopware-smtp-credentials
+  #   type: "kubernetes.io/basic-auth"
+  #   namespace: shopware
+  #   options:
+  #     disableNameSuffixHash: true
+  #   literals:
+  #     - username=shop@delta4x4.net
+  #   files:
+  #     - password=smtp_password.txt
+  # Application secrets
+  - name: shopware-app-secrets
+    type: Opaque
+    namespace: shopware
+    options:
+      disableNameSuffixHash: true
+    files:
+      - instance_id=instance_id.txt
+      - app_secret=app_secret.txt
 endef
 
 # ---------------------------
@@ -424,11 +505,7 @@ mysql-import:
 # ---------------------------
 
 .PHONY: secrets
-secrets: secrets-dir secrets-auth secrets-gen-ca secrets-gen-server
-	$(call log_notice, "Creating development Kustomization!")
-	@cp .env $(SECRETS_DIR)/.env.tmp
-	@echo $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32) > $(SECRETS_DIR)/db_password.txt
-	$(file > $(SECRETS_DIR)/kustomization.yaml,$(DEV_KUSTOMIZATION))
+secrets: secrets-dir secrets-auth secrets-gen-ca secrets-gen-server secrets-gen-kubernetes
 
 # Generate the Symfony projects local '.env' file to configure the project
 .PHONY: dotenv
@@ -487,6 +564,52 @@ else
 		 | cfssljson -bare server
 endif
 
+# Generate secret values for use with our Kubernetes manifests
+.PHONY: secrets-gen-kubernetes
+secrets-gen-kubernetes:
+	$(call log_notice, "Generating Shopware Admin credentials")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48) > $(SECRETS_DIR)/shopware_admin_password.txt
+	$(call log_notice, "Generating Shopware MySQL credentials")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48) > $(SECRETS_DIR)/db_password.txt
+	$(call log_notice, "Generating Shopware Redis credentials")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48) > $(SECRETS_DIR)/redis_password.txt
+	$(call log_notice, "Generating Shopware OpenSearch credentials")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48) > $(SECRETS_DIR)/opensearch_password.txt
+	$(call log_notice, "Generating Shopware RabbitMQ credentials")
+	$(eval RABBITMQ_PASS := $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48))
+	@echo -n "$(RABBITMQ_PASS)" > $(SECRETS_DIR)/rabbitmq_password.txt
+	@echo "default_user = shopware" > $(SECRETS_DIR)/rabbitmq_default-user-conf.txt
+	@echo "default_pass = $(RABBITMQ_PASS)" >> $(SECRETS_DIR)/rabbitmq_default-user-conf.txt
+	$(call log_attention, "Attempting to auto-create Shopware S3 credentials. Please manually ensure correctness!")
+ifdef S3_ACCESS_KEY
+	@echo "S3 Access Key is defined in environment, re-using value..."
+	@echo -n $(S3_ACCESS_KEY) > $(SECRETS_DIR)/s3_access_key.txt
+else
+	@echo "S3 Access Key is not defined in environment, generating value..."
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32) > $(SECRETS_DIR)/s3_access_key.txt
+endif
+ifdef S3_SECRET_KEY
+	@echo "S3 Secret Access Key is defined in environment, re-using value..."
+	@echo -n $(S3_SECRET_KEY) > $(SECRETS_DIR)/s3_secret_key.txt
+else
+	@echo "S3 Secret Access Key is not defined in environment, generating value..."
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 64) > $(SECRETS_DIR)/s3_secret_key.txt
+endif
+ifdef S3_ENDPOINT
+	@echo "S3 endpoint is defined in environment, re-using value..."
+	@echo -n $(S3_ENDPOINT) > $(SECRETS_DIR)/s3_endpoint.txt
+else
+	@echo "S3 endpoint is not defined in environment, assuming default AWS endpoint (https://s3.amazonaws.com)..."
+	@echo -n "https://s3.amazonaws.com" > $(SECRETS_DIR)/s3_endpoint.txt
+endif
+	$(call log_notice, "Generating Shopware SMTP credentials")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 48) > $(SECRETS_DIR)/smtp_password.txt
+	$(call log_notice, "Generating Shopware instance ID and application secret")
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 16) > $(SECRETS_DIR)/instance_id.txt
+	@echo -n $(shell head -c 512 /dev/urandom | LC_CTYPE=C tr -cd 'a-zA-Z0-9' | head -c 32) > $(SECRETS_DIR)/app_secret.txt
+	$(call log_success, "Successfully generated all secrets - creating Kustomization for deployment!")
+	$(file > $(SECRETS_DIR)/kustomization.yaml,$(DEV_KUSTOMIZATION))
+
 # ---------------------------
 # Destinations
 # ---------------------------
@@ -537,6 +660,8 @@ prune-files: prune-secrets prune-output prune-deps prune-var prune-public prune-
 prune-secrets:
 	$(call log_attention, "Removing secrets in $(SECRETS_DIR)!")
 	rm -rf $(SECRETS_DIR)
+	rm -f $(ROOT_DIR)/auth.json
+	rm -f $(ROOT_DIR)/.uniqueid.txt
 
 .PHONY: prune-output
 prune-output:

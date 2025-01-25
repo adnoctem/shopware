@@ -3,302 +3,282 @@
 # ref: https://docs.docker.com/build/buildkit/dockerfile-release-notes/
 # Set the Docker syntax version. Limit features to release from 27-11-2024.
 
+# NOTE: large parts of this code are inspired by (or taken) from the official Docker Inc. Wordpress image
+# ref: https://github.com/docker-library/wordpress
+
 ARG PHP_VERSION=8.3
-ARG NODE_VERSION=22
+ARG NODE_VERSION=20.18.2
+# use --with-dev-dependencies for development (see docker-bake.hcl)
+ARG BUILD_CMD="shopware-cli project ci ."
+ARG APP_ENV=prod
 
-# lock versions
-FROM node:$NODE_VERSION-alpine AS node
-FROM php:$PHP_VERSION-fpm-alpine AS php-base
+FROM php:$PHP_VERSION-fpm-bookworm AS base
 
-# install `install-php-extensions` to install extensions (and composer) with all dependencies included
-# install Shopware required PHP extensions and the latest version of Composer
-# ref: https://github.com/mlocati/docker-php-extension-installer
-# ref: https://developer.shopware.com/docs/guides/installation/requirements.html
-RUN  --mount=type=bind,from=mlocati/php-extension-installer:latest,source=/usr/bin/install-php-extensions,target=/usr/local/bin/install-php-extensions \
-    install-php-extensions \
-        @composer \
-        bcmath \
-        gd \
-        intl \
-        mysqli \
-        pdo_mysql \
-        sockets \
-        bz2 \
-        zip \
-        redis \
-        opcache \
-        apcu \
-        sodium
+ARG NODE_VERSION
+ARG APP_ENV
+USER root
 
-# -------------------------------------
-# PHP configuration
-# -------------------------------------
-FROM php-base AS php
-
-ARG EXTRA_PHP_EXTENSIONS="opentelemetry grpc"
-
-RUN  --mount=type=bind,from=mlocati/php-extension-installer:latest,source=/usr/bin/install-php-extensions,target=/usr/local/bin/install-php-extensions \
-    install-php-extensions ${EXTRA_PHP_EXTENSIONS}
-
-# define core environment variables (php-cli, php-fpm, utils.sh)
-ENV DATABASE_TIMEOUT=120 \
-    OPENSEARCH_TIMEOUT=120 \
-    REDIS_TIMEOUT=120 \
-    PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT" \
-    PHP_DISPLAY_ERRORS="Off" \
-    PHP_MAX_UPLOAD_SIZE="32M" \
-    PHP_MAX_EXECUTION_TIME=60 \
-    PHP_MEMORY_LIMIT="512M" \
-    PHP_SESSION_COOKIE_LIFETIME=0 \
-    PHP_SESSION_GC_MAXLIFETIME=1440 \
-    PHP_SESSION_HANDLER="files" \
-    PHP_SESSION_SAVE_PATH="" \
-    PHP_OPCACHE_ENABLE_CLI=0 \
-    PHP_OPCACHE_FILE_OVERRIDE=1 \
-    PHP_OPCACHE_VALIDATE_TIMESTAMPS=0 \
-    PHP_OPCACHE_INTERNED_STRINGS_BUFFER=20 \
-    PHP_OPCACHE_MAX_ACCELERATED_FILES=10000 \
-    PHP_OPCACHE_MEMORY_CONSUMPTION=128 \
-    PHP_OPCACHE_FILE_CACHE="" \
-    PHP_OPCACHE_FILE_CACHE_ONLY=0 \
-    PHP_REALPATH_CACHE_TTL="4096k" \
-    PHP_REALPATH_CACHE_SIZE=3600 \
-    PHP_FPM_PM="dynamic" \
-    PHP_FPM_LISTEN="/run/php/php-fpm.sock" \
-    PHP_FPM_MAX_CHILDREN=15 \
-    PHP_FPM_START_SERVERS=5 \
-    PHP_FPM_MIN_SPARE_SERVERS=2 \
-    PHP_FPM_MAX_SPARE_SERVERS=5 \
-    PHP_FPM_MAX_SPAWN_RATE=2 \
-    PHP_FPM_PROCESS_IDLE_TIMEOUT=10s \
-    PHP_FPM_MAX_REQUESTS=0 \
-    PHP_FPM_STATUS_PATH="/-/fpm/status" \
-    PHP_FPM_PING_PATH="/-/fpm/ping" \
-    PHP_FPM_ACCESS_LOG="/proc/self/fd/1" \
-    PHP_FPM_ERROR_LOG="/proc/self/fd/2" \
-    PHP_FPM_LOG_LEVEL="notice" \
-    PHP_FPM_DAEMONIZE="no" \
-    PHP_FPM_RLIMIT_FILES=8192 \
-    PHP_FPM_LOG_LIMIT=8192
-
-# Remove default directories (or create required ones)
-RUN rm -rf /usr/local/etc/php/php.ini* ; \
-    rm -rf /usr/local/etc/php-fpm.d/* ; \
-    rm -rf /usr/local/etc/php-fpm.conf* ; \
-    mkdir -p /etc/supervisor/conf.d
-
-# copy config files for PHP, PHP-FPM & Supervisor
-COPY --chmod=644 docker/conf/php/php.ini /usr/local/etc/php
-COPY --chmod=644 docker/conf/php/docker-php.ini /usr/local/etc/php/conf.d
-COPY --chmod=644 docker/conf/php-fpm/php-fpm.conf /usr/local/etc
-COPY --chmod=644 docker/conf/php-fpm/www.conf /usr/local/etc/php-fpm.d
-COPY --chmod=644 docker/conf/supervisor/supervisord.conf /etc/supervisor
-
-# -------------------------------------
-# System + Environment configuration
-# -------------------------------------
-FROM php AS system
-
-ARG PORT
-ARG USER=shopware
-ARG PUID=1001
-ARG PGID=1001
-
-# create (unprivileged) shopware user and create/own required directories
-# NOTE: logs should be redirected to std streams
-RUN \
-    addgroup -g ${PGID} -S ${USER} ; \
-	  adduser -D ${USER} -G ${USER} -u ${PUID} ; \
-    mkdir -p -m 755 /var/www/html /run/php ; \
-    chown -R ${PUID}:${PGID} /var/www/html /run/php
-
-# install Node.js at the given version
-COPY --from=node /usr/lib /usr/lib
-COPY --from=node /usr/local/lib /usr/local/lib
-COPY --from=node /usr/local/include /usr/local/include
-COPY --from=node /usr/local/bin /usr/local/bin
-
-# configure Shell and install base dependencies
-RUN apk update && apk add --no-cache \
-    bash=~5.2 \
-    jq=~1.7 \
-    fcgi \
-    trurl \
-    acl \
-    shadow
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
-
-# ensure we source the new bashrc even if we're not in a login shell
-# ref: https://stackoverflow.com/questions/38024160/how-to-get-etc-profile-to-run-automatically-in-alpine-docker
-ENV ENV=${HOME}/.bashrc
-
-# set doc-root
+VOLUME ["/var/www/html"]
 WORKDIR /var/www/html
 
-# switch shells & ensure we source /etc/profile and our utils
-RUN chsh -s /bin/bash shopware ; \
-    chsh -s /bin/bash root ; \
-    echo ". /etc/profile" >> /home/${USER}/.bashrc ; \
-    echo ". /etc/profile" >> /root/.bashrc ; \
-    echo ". /usr/local/lib/utils.sh" >> /home/${USER}/.bashrc ; \
-    echo ". /usr/local/lib/utils.sh" >> /root/.bashrc ; \
-    ln -s /dev/null /home/${USER}/.bash_history ; \
-    ln -s /dev/null /home/${USER}/.ash_history ; \
-    ln -s /dev/null /root/.bash_history ; \
-    ln -s /dev/null /root/.ash_history ; \
-    setfacl -PRd -m user:${USER}:rwx,group:${USER}:rw,other::r .
+# install PHP \
+# install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
+RUN set -ex; \
+	savedAptMark="$(apt-mark showmanual)"; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		libavif-dev \
+		libfreetype6-dev \
+		libicu-dev \
+		libjpeg-dev \
+		libpng-dev \
+		libwebp-dev \
+		libzip-dev \
+    libbz2-dev \
+    libsodium-dev \
+    libzstd-dev \
+    zlib1g-dev \
+    librabbitmq-dev \
+    libssh-dev \
+	; \
+	\
+	docker-php-ext-configure gd \
+		--with-avif \
+		--with-freetype \
+		--with-jpeg \
+		--with-webp \
+	; \
+	docker-php-ext-install -j "$(nproc)" \
+		bcmath \
+		exif \
+		gd \
+		intl \
+		mysqli \
+    pdo_mysql \
+		zip \
+    sockets \
+    bz2 \
+    sodium \
+	; \
+    \
+# install community extensions
+    EXTENSIONS=( \
+      "apcu" \
+      "redis" \
+      "grpc" \
+      "opentelemetry" \
+      "amqp" \
+      "zstd" \
+    ) ; \
+    for EXT in "${EXTENSIONS[@]}"; do \
+        MAKEFLAGS="-j $(nproc)" pecl install --onlyreqdeps --force "${EXT}" ; \
+        docker-php-ext-enable "${EXT}" ; \
+    done ; \
+    rm -rf /tmp/pear ; \
+    \
+# Zend extensions
+    ZEND_EXTENSIONS=( \
+      "opcache" \
+    ) ; \
+    for ZEXT in "${ZEND_EXTENSIONS[@]}"; do \
+        docker-php-ext-enable "${ZEXT}" ; \
+    done ; \
+    \
+# some misbehaving extensions end up outputting to stdout 🙈 (https://github.com/docker-library/wordpress/issues/669#issuecomment-993945967)
+	out="$(php -r 'exit(0);')"; \
+	[ -z "$out" ]; \
+	err="$(php -r 'exit(0);' 3>&1 1>&2 2>&3)"; \
+	[ -z "$err" ]; \
+	\
+	extDir="$(php -r 'echo ini_get("extension_dir");')"; \
+	[ -d "$extDir" ]; \
+# reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
+	apt-mark auto '.*' > /dev/null; \
+	[ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; \
+	ldd "$extDir"/*.so \
+		| awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); printf "*%s\n", so }' \
+		| sort -u \
+		| xargs -r dpkg-query --search \
+		| cut -d: -f1 \
+		| sort -u \
+		| xargs -rt apt-mark manual; \
+	\
+	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+	rm -rf /var/lib/apt/lists/*; \
+	\
+	! { ldd "$extDir"/*.so | grep 'not found'; }; \
+# check for output like "PHP Warning:  PHP Startup: Unable to load dynamic library 'foo' (tried: ...)
+	err="$(php --version 3>&1 1>&2 2>&3)"; \
+	[ -z "$err" ]; \
+    \
+# strip built shared-objects to decrease size
+    find "$extDir" -name '*.so' -type f -exec strip --strip-all {} \;
 
-# Mitigate invalid credentials in Shopware's Flysystem adapter,
-# pre-setting known AWS environment variables to lock credentials,
-# for the underlying AWS PHP SDK.
-#
-# ref: https://github.com/thephpleague/flysystem/issues/1759
-RUN echo -e "\n# DO NOT REMOVE - the AWS SDK requires these\n" >> /etc/profile ; \
-    echo 'export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY' >> /etc/profile ; \
-    echo 'export AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY' >> /etc/profile
-    # echo -e "\n# Shopware environment variables\n" >> /etc/profile ; \
-    # echo 'export DATABASE_URL=mysql://$DATABASE_USER:$DATABASE_PASSWORD@$DATABASE_HOST:$DATABASE_PORT/$DATABASE_NAME' >> /etc/profile ; \
-    # echo 'export OPENSEARCH_URL=http://$OPENSEARCH_USER:$OPENSEARCH_PASSWORD@$OPENSEARCH_HOST:$OPENSEARCH_PORT' >> /etc/profile ; \
-    # echo 'export REDIS_URL=mysql://$REDIS_USER:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT/$REDIS_DB' >> /etc/profile ; \
-    # echo 'export MAILER_DSN=mysql://$SMTP_USER:$SMTP_PASSWORD@$SMTP_HOST:$SMTP_PORT' >> /etc/profile
+RUN set -eux; \
+    # (re)move files & create directories
+    mv "${PHP_INI_DIR}/php.ini-production" "${PHP_INI_DIR}/php.ini"; \
+    rm -f /usr/local/etc/php-fpm.d/zz-docker.conf; \
+    rm -f /usr/local/etc/php-fpm.d/www.conf; \
+    rm -f /usr/local/etc/php-fpm.d/www.conf.default; \
+    mkdir -m 755 -p /opt/adnoctem/bin /opt/adnoctem/lib /opt/adnoctem/conf; \
+    mkdir -m 775 -p /run/php && chmod 755 /var/www/html; \
+    \
+    # configure general PHP settings
+    # see: https://developer.shopware.com/docs/guides/installation/requirements.html
+	{ \
+    echo 'expose_php=Off'; \
+    echo 'error_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT'; \
+    echo 'display_errors=Off'; \
+    echo 'display_startup_errors=Off'; \
+    echo 'log_errors = On'; \
+    echo 'error_log = /dev/stderr'; \
+    echo 'log_errors_max_len = 1024'; \
+    echo 'ignore_repeated_errors = On'; \
+    echo 'ignore_repeated_source = Off'; \
+    echo 'html_errors = Off'; \
+    echo 'upload_max_filesize=32M'; \
+    echo 'post_max_size=32M'; \
+    echo 'max_execution_time=120'; \
+    echo 'memory_limit=512M'; \
+	} > /usr/local/etc/php/conf.d/general.ini ; \
+    \
+  # set recommended session PHP.ini settings
+	{ \
+		echo 'session.cookie_lifetime=0'; \
+    echo 'session.save_handler=files'; \
+    echo 'session.save_path='; \
+    echo 'session.gc_probability=0'; \
+    echo 'session.gc_maxlifetime=1440'; \
+	} > /usr/local/etc/php/conf.d/session.ini ; \
+    \
+  # set recommended OPCache PHP.ini settings
+  # see https://secure.php.net/manual/en/opcache.installation.php
+  # and https://developer.shopware.com/docs/guides/hosting/performance/performance-tweaks.html#php-config-tweaks
+	{ \
+    echo 'opcache.enable_cli=0'; \
+    echo 'opcache.enable_file_override=1'; \
+    echo 'opcache.validate_timestamps=0'; \
+    echo 'opcache.interned_strings_buffer=20'; \
+    echo 'opcache.file_cache='; \
+    echo 'opcache.file_cache_only=0'; \
+    echo 'opcache.memory_consumption=128'; \
+    echo 'opcache.max_accelerated_files=25000'; \
+    echo 'opcache.revalidate_freq=2'; \
+    echo 'zend.assertions=-1'; \
+    echo 'zend.detect_unicode=0'; \
+	} > /usr/local/etc/php/conf.d/opcache.ini ; \
+    \
+  # set recommended realpath PHP.ini settings
+	{ \
+		echo 'realpath_cache_ttl=3600'; \
+    echo 'realpath_cache_size=4096k'; \
+	} > /usr/local/etc/php/conf.d/realpath.ini ; \
+    \
+  # set recommended PHP-FPM settings
+	{ \
+    echo '[global]'; \
+    echo 'daemonize=no'; \
+    echo 'error_log=/proc/self/fd/2'; \
+  # see: https://github.com/docker-library/php/pull/725#issuecomment-443540114
+    echo 'log_limit = 8192'; \
+    echo '[www]'; \
+    echo 'user=1001'; \
+    echo 'group=1001'; \
+    echo 'listen=/run/php/php-fpm.sock'; \
+    echo 'listen.mode=0666'; \
+    echo 'pm=dynamic'; \
+    echo 'pm.max_children=15'; \
+    echo 'pm.start_servers=5'; \
+    echo 'pm.min_spare_servers=2'; \
+    echo 'pm.max_spare_servers=5'; \
+    echo 'pm.max_spawn_rate=2'; \
+    echo 'pm.process_idle_timeout=10s'; \
+    echo 'pm.max_requests=0'; \
+    echo 'pm.status_path=/-/fpm/status'; \
+    echo 'ping.path=/-/fpm/ping'; \
+    echo 'access.log=/dev/null'; \
+    echo 'rlimit_files=8192'; \
+    echo 'catch_workers_output=yes'; \
+    echo 'decorate_workers_output=no'; \
+    echo 'clear_env=no'; \
+    echo 'php_admin_flag[log_errors]=on'; \
+	} > /usr/local/etc/php-fpm.d/docker.conf
 
-# add container executables and library scripts
-COPY --chmod=755 docker/bin/swctl /usr/local/bin
-COPY --chmod=644 docker/lib/utils.sh /usr/local/lib/utils.sh
+# install Node.js, Composer, jq, socat and Shopware-CLI
+RUN set -eux; \
+    apt-get update; \
+	  apt-get install -y --no-install-recommends  \
+      netcat-openbsd curl libcurl4-openssl-dev; \
+    # Shopware CLI - see: https://sw-cli.fos.gg/install/
+    curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.deb.sh' | bash; \
+    apt-get install -y --no-install-recommends shopware-cli; \
+    cd /tmp ; \
+    # Node + npm/npx - see: https://nodejs.org/dist/
+    curl -fLO https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz; \
+    tar -f node-v$NODE_VERSION-linux-x64.tar.gz -zx --exclude="*.md" --exclude="LICENSE" --exclude="include"  --exclude="share"  -C /usr/local --strip-components 1;\
+    cd /tmp; \
+    # static trurl binary - see: https://jqlang.github.io/jq/download/
+    curl -fLO https://github.com/curl/trurl/releases/download/trurl-0.16/trurl-0.16.tar.gz ; \
+    tar --extract --file trurl-0.16.tar.gz ; \
+    cd trurl-0.16 ; \
+    make && make install ; \
+    cd /tmp; \
+    # static socat binary - see: https://github.com/ernw/static-toolbox
+    curl -fLO https://github.com/ernw/static-toolbox/releases/download/socat-v1.7.4.4/socat-1.7.4.4-x86_64 ; \
+    chmod +x socat-1.7.4.4-x86_64 ; \
+    mv socat-1.7.4.4-x86_64 /usr/local/bin/socat ; \
+    # static jq binary - see: https://jqlang.github.io/jq/download/ \
+    curl -fLO https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 ; \
+    chmod +x jq-linux-amd64 ; \
+    mv jq-linux-amd64 /usr/local/bin/jq ; \
+    cd /tmp; \
+    # install composer - see: \
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
+    php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"; \
+    php composer-setup.php; \
+    php -r "unlink('composer-setup.php');"; \
+    mv composer.phar /usr/local/bin/composer; \
+    cd /tmp; \
+    # remove installation-dependencies
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false curl libcurl4-openssl-dev; \
+    rm -rf /tmp/* /var/lib/apt/lists/* /var/cache/apt/archives
 
-# switch to unprivileged user
-USER ${PUID}:${PGID}
-
-# NOTE: volumes have largely been deprecated as Shopware now relies on an S3 bucket for remote state
-# VOLUME [ "/var/www/html/files", "/var/www/html/public/theme", "/var/www/html/public/media", "/var/www/html/public/thumbnail", "/var/www/html/public/public" ]
-
-# add a healthcheck
-# ref: https://maxchadwick.xyz/blog/getting-the-php-fpm-status-from-the-command-line
-HEALTHCHECK --start-period=3m --timeout=10s --interval=15s --retries=25 \
-   CMD cgi-fcgi -bind -connect ${PHP_FPM_LISTEN} | grep -q "Status" || exit 1
-
-# execute 'swctl' by default
-ENTRYPOINT ["swctl"]
-
-# -------------------------------------
-# Base Shopware configuration
-# -------------------------------------
-FROM system AS base
-
-ARG USER
-ARG PUID
-ARG PGID
-
-# install Shopware-CLI
-# ref: https://sw-cli.fos.gg/install/
-USER root
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/friendsofshopware/stable/setup.alpine.sh' | bash ; \
-    apk add --no-cache shopware-cli ; \
-    npm config set cache "/tmp/npm" --global
-
-# Define Shopware's default settings
-ENV APP_ENV=dev \
-    APP_SECRET="" \
-    APP_URL="https://shopware.internal" \
-    APP_URL_CHECK_DISABLED=1 \
-    INSTANCE_ID="" \
-    LOCK_DSN=flock \
-    MAILER_DSN=null://null \
-    DATABASE_URL="mysql://shopware:shopware@mysql:3306/shopware" \
-    BLUE_GREEN_DEPLOYMENT=0 \
-    # HTTP caching settings (disabled by default)
-    SHOPWARE_HTTP_CACHE_ENABLED=0 \
-    SHOPWARE_HTTP_DEFAULT_TTL=7200 \
-    SHOPWARE_CACHE_ID=docker \
-    SHOPWARE_SKIP_WEBINSTALLER=1 \
-    STOREFRONT_PROXY_URL=${APP_URL:-"https://shopware.internal"} \
-    # disable ElasticSearch/OpenSearch by default
-    SHOPWARE_ES_ENABLED=0 \
-    OPENSEARCH_URL="http://opensearch:9200" \
-    SHOPWARE_ES_INDEXING_ENABLED=0 \
-    SHOPWARE_ES_INDEX_PREFIX="sw" \
-    SHOPWARE_ES_THROW_EXCEPTION=1 \
+ENV PATH="/opt/adnoctem/bin:/usr/local/bin:/usr/local/sbin:$PATH" \
+    COMPOSER_HOME=/tmp/composer \
+    COMPOSER_CACHE_DIR=/tmp/composer/cache \
+    COMPOSER_ALLOW_SUPERUSER=1 \
+    npm_config_cache=/tmp/npm/cache \
     # force the use of the Composer-based plugin loader
     # ref: https://developer.shopware.com/docs/guides/hosting/installation-updates/deployments/build-w-o-db.html#compiling-the-administration-without-database
     COMPOSER_PLUGIN_LOADER=1 \
-    COMPOSER_HOME="/tmp/composer" \
-    # disable OpenTelemetry by default
-    OTEL_PHP_AUTOLOAD_ENABLED=false \
-    OTEL_PHP_DISABLED_INSTRUMENTATIONS=shopware \
-    OTEL_SERVICE_NAME=shopware \
-    OTEL_TRACES_EXPORTER=otlp \
-    OTEL_LOGS_EXPORTER=otlp \
-    OTEL_METRICS_EXPORTER=otlp \
-    OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
-    OTEL_EXPORTER_OTLP_ENDPOINT="https://tempo:4317" \
-    # S3 configuration
-    S3_PUBLIC_BUCKET=shop-public \
-    S3_PRIVATE_BUCKET=shop-private \
-    S3_REGION=eu-north-1 \
-    S3_ACCESS_KEY=CHANGEME \
-    S3_SECRET_KEY=CHANGEME \
-    S3_ENDPOINT="https://s3.eu-north-1.amazonaws.com" \
-    S3_CDN_URL="https://shop.cdn.fmj.services" \
-    S3_USE_PATH_STYLE_ENDPOINT="true" \
-    # Redis overrides
-    PHP_SESSION_HANDLER="redis" \
-    PHP_SESSION_SAVE_PATH="tcp://redis:6379" \
-    REDIS_URL="redis://redis:6379" \
-    # build settings
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     DISABLE_ADMIN_COMPILATION_TYPECHECK=true \
-    # deployment-helper - define defaults
-    INSTALL_LOCALE=en-GB \
-    INSTALL_CURRENCY=EUR \
-    SALES_CHANNEL_URL=${APP_URL:-"https://shopware.internal"}
+    # required (default) Shopware settings
+    APP_ENV=$APP_ENV \
+    LOCK_DSN="flock"
 
-# (re)-switch to unprivileged user
-USER ${PUID}:${PGID}
+FROM base AS builder
 
-# -------------------------------------
-# DEVELOPMENT Image
-# -------------------------------------
-FROM base AS dev
+ARG BUILD_CMD
 
-# (re)-instantiate ARGs
-ARG PUID
-ARG PGID
-
-# copy all (non-ignored) sources
-ADD --chown=${PUID}:${PGID} --chmod=740 . .
-RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/composer \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/npm \
-    shopware-cli project ci --with-dev-dependencies . ; \
-    rm -rf ./docker ; \
-    echo "$(date '+%d-%m-%Y_%T')" >> install.lock
-
-# initialize and run Shopware
-CMD ["run"]
-
-# -------------------------------------
-# PRODUCTION Image
-# -------------------------------------
-FROM base AS prod
-# (re)-instantiate ARGs
-ARG PUID
-ARG PGID
-
-# overwrite defaults
-ENV APP_ENV=prod \
-    SHOPWARE_HTTP_CACHE_ENABLED=1 \
-    APP_URL_CHECK_DISABLED=1
-
-# link files for production build
-COPY --link --chown=${PUID}:${PGID} --chmod=740 . .
-RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/composer \
-    --mount=type=cache,uid=${PUID},gid=${PGID},target=/tmp/npm \
-    # (required) S3 credentials
+# link files for build
+COPY --link --chown=1001 --chmod=750 . .
+RUN --mount=type=cache,target=/tmp/composer/cache \
+    --mount=type=cache,target=/tmp/npm/cache \
+    --mount=type=secret,id=composer_auth,target=./auth.json \
+    # DSNs/URLs \
+    --mount=type=secret,id=DATABASE_URL,env=DATABASE_URL \
+    --mount=type=secret,id=OPENSEARCH_URL,env=OPENSEARCH_URL \
+    --mount=type=secret,id=REDIS_URL,env=REDIS_URL \
+    --mount=type=secret,id=MESSENGER_TRANSPORT_DSN,env=MESSENGER_TRANSPORT_DSN \
+    --mount=type=secret,id=MAILER_DSN,env=MAILER_DSN \
+    --mount=type=secret,id=LOCK_DSN,env=LOCK_DSN \
+    # S3
     --mount=type=secret,id=S3_PUBLIC_BUCKET,env=S3_PUBLIC_BUCKET \
     --mount=type=secret,id=S3_PRIVATE_BUCKET,env=S3_PRIVATE_BUCKET \
     --mount=type=secret,id=S3_REGION,env=S3_REGION \
@@ -310,9 +290,86 @@ RUN --mount=type=secret,uid=${PUID},gid=${PGID},id=composer_auth,dst=./auth.json
     # mitigate invalid S3 credentials
     --mount=type=secret,id=S3_ACCESS_KEY,env=AWS_ACCESS_KEY_ID \
     --mount=type=secret,id=S3_SECRET_KEY,env=AWS_SECRET_ACCESS_KEY \
-    shopware-cli project ci . ; \
+    $BUILD_CMD ; \
     rm -rf ./docker ; \
     echo "$(date '+%d-%m-%Y_%T')" >> install.lock
 
-# initialize and run Shopware
-CMD ["run"]
+COPY --chmod=755 docker/lib/lib*.sh /opt/adnoctem/lib
+COPY --chmod=755 docker/conf/*.sh /opt/adnoctem/conf
+COPY --chmod=755 docker/bin/entrypoint.sh /opt/adnoctem/bin
+
+RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true ; \
+    chmod g+rwX -R /var/www/html
+
+# ref: https://unix.stackexchange.com/questions/556748/how-to-check-whether-a-socket-is-listening-or-not
+HEALTHCHECK --start-period=120s --timeout=5s --interval=15s --retries=10 \
+   CMD socat -u OPEN:/dev/null UNIX-CONNECT:/run/php/php-fpm.sock || exit 1
+
+# -------------------------------------
+# Final Image
+# -------------------------------------
+FROM builder AS final
+
+# cleanup
+RUN set -eux; \
+    find /usr/local -type f -executable -exec ldd '{}' ';' \
+    | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); print so }' \
+    | sort -u \
+    | xargs -r dpkg-query --search \
+    | cut -d: -f1 \
+    | sort -u \
+    | xargs -r apt-mark manual; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    # remove obsolete packages
+    \
+    PACKAGES=( \
+      "gcc" \
+      "gcc-12" \
+      "g++" \
+      "autoconf" \
+      "binutils" \
+      "pkg-config" \
+      "pkgconf" \
+      "make" \
+      "shopware-cli" \
+      #"perl" \
+      "gpg" \
+      # "sed" \
+      #"xz-utils" \
+      "grep" \
+      #"gzip" \
+    ) ; \
+    for PKG in "${PACKAGES[@]}"; do \
+        apt-get purge -y --auto-remove --allow-remove-essential "${PKG}" ; \
+    done ; \
+    # remove obsolete binaries and files
+    \
+    LOCATIONS=( \
+      /usr/local/bin/composer \
+      /usr/local/bin/corepack \
+      /usr/local/bin/np* \
+      /usr/local/bin/docker-php-* \
+      /usr/local/bin/pear* \
+      /usr/local/bin/pecl \
+      /usr/local/bin/phar* \
+      /usr/local/bin/phpize \
+      /usr/local/bin/php-config \
+      /usr/local/php \
+      /usr/local/lib/node_modules \
+    ) ; \
+    for LOC in "${LOCATIONS[@]}"; do \
+      rm -rf ${LOC} ; \
+    done ; \
+    find /usr/local/lib/php/ -mindepth 1 -maxdepth 1 ! -name extensions -exec rm -rf {} \; ;\
+    # final cleanup
+    \
+    apt-get clean -y ; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives;
+
+USER 1001
+
+SHELL ["/bin/bash", "-c"]
+STOPSIGNAL SIGQUIT
+
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["-F"]

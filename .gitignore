@@ -38,6 +38,8 @@ secrets/
 auth.json
 install.lock
 public/asset-manifest.json
+deploy/docker/overrides/*
+!deploy/docker/overrides/.gitkeep
 ###< shopware/core ###
 
 ###> friendsofphp/php-cs-fixer ###

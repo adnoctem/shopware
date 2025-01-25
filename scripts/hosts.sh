@@ -29,9 +29,9 @@ CONFIG_END="# SHOPWARE MANAGED END"
 CONFIG=$(
 	cat <<EOF
 ${CONFIG_START}
-# This segment is managed by FMJdev's shopware - do not modify!
+# This segment is managed by adnoctem/shopware - do not modify!
 
-# fmjdev/shopware - FMJ Studios Shopware 6
+# adnoctem/shopware - Ad Noctem Collective Shopware 6
 127.0.0.1               shopware.internal                             # Top-Level Domain
 127.0.0.1               traefik.shopware.internal                     # Traefik dashboard subdomain
 127.0.0.1               opensearch.shopware.internal                  # OpenSearch WebUI
@@ -39,7 +39,7 @@ ${CONFIG_START}
 127.0.0.1               phpmyadmin.shopware.internal                  # PHPMyAdmin
 127.0.0.1               grafana.shopware.internal                     # Grafana
 127.0.0.1               prometheus.shopware.internal                  # Prometheus
-127.0.0.1               minio.shopware.internal                       # MinIO
+127.0.0.1               rabbitmq.shopware.internal                    # RabbitMQ Management
 
 ${CONFIG_END}
 EOF

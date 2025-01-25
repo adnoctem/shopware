@@ -12,6 +12,9 @@
 . /opt/adnoctem/lib/liblog.sh
 . /opt/adnoctem/lib/libcheck.sh
 
+# (ensure env is loaded) - also loaded in entrypoint
+. /opt/adnoctem/conf/env.sh
+
 # Constants
 DOCROOT="$(pwd)"
 SW_TOOL="${DOCROOT}/bin/console" # use console by default
@@ -21,16 +24,6 @@ STOREFRONT_LOCATIONS=(
 	  'config/packages/dev/storefront.yaml'
 )
 STOREFRONT_DESTINATION="/tmp/storefront"
-
-# ensure we have the bare defaults set
-export APP_ENV="${APP_ENV:-"dev"}"
-export INSTALL_LOCALE="${INSTALL_LOCALE:-"de-DE"}"
-export INSTALL_CURRENCY="${INSTALL_CURRENCY:-"EUR"}"
-export INSTALL_ADMIN_USERNAME="${INSTALL_ADMIN_USERNAME:-"admin"}"
-export INSTALL_ADMIN_PASSWORD="${INSTALL_ADMIN_PASSWORD:-"shopware"}"
-export SALES_CHANNEL_NAME=${SALES_CHANNEL_NAME:-"Storefront"}
-export SALES_CHANNEL_URL="${APP_URL:-"http://localhost:8000"}"
-export SALES_CHANNEL_THEME=${SALES_CHANNEL_THEME:-"Storefront"}
 
 #######################################
 # Ensure we're in the project root.
@@ -44,7 +37,7 @@ export SALES_CHANNEL_THEME=${SALES_CHANNEL_THEME:-"Storefront"}
 ensure_project_root() {
 	# check if current dir
 	if [ ! -e "${DOCROOT}/composer.json" ]; then
-		log "ERROR: script is not being executed from project root!"
+		log::red "ERROR: script is not being executed from project root!"
 		exit 1
 	fi
 }
@@ -112,46 +105,6 @@ run_deployment_helper() {
 	ensure_project_root
 	log::yellow "Starting Deployment Helper"
 	exec vendor/bin/shopware-deployment-helper run
-}
-
-#######################################
-# Run the Shopware CLI message worker.
-#
-# Globals:
-#   None
-# Arguments:
-#   None
-# Outputs:
-#   Message worker outputs.
-#######################################
-run_message_worker() {
-	echo "|--------------------------------------------------------------|"
-	echo "|              Running Shopware Message Worker                 |"
-	echo "|--------------------------------------------------------------|"
-
-	ensure_project_root
-	log::yellow "Starting Shopware message worker"
-	exec pc messenger:consume --time-limit=360 --memory-limit=512M async low_priority
-}
-
-#######################################
-# Run the Shopware CLI cron worker.
-#
-# Globals:
-#   None
-# Arguments:
-#   None
-# Outputs:
-#   Message worker outputs.
-#######################################
-run_cron_worker() {
-	echo "|--------------------------------------------------------------|"
-	echo "|                Running Shopware Cron Worker                  |"
-	echo "|--------------------------------------------------------------|"
-
-	ensure_project_root
-	log::yellow "Starting Shopware cron worker"
-	exec pc scheduled-task:run --no-wait
 }
 
 #######################################
@@ -271,6 +224,20 @@ shopware_update_plugins() {
 }
 
 #######################################
+# Set up the transports for messaging.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   Shopware CLI outputs.
+#######################################
+shopware_setup_transports() {
+		log::yellow "INFO: Setting up Shopware messenger transports"
+  	pc -n messenger:setup-transports
+}
+
+#######################################
 # NOTE: DEPRECATED - USE 'deployment_helper'
 # Set up a new Shopware installation.
 # Globals:
@@ -294,27 +261,30 @@ shopware_install() {
   remove_storefront_config
 
 	log::yellow "INFO: Initializing database for Shopware"
-	pc system:install --create-database "--shop-locale=$INSTALL_LOCALE" "--shop-currency=$INSTALL_CURRENCY" --force
+	pc -n system:install --create-database "--shop-locale=$INSTALL_LOCALE" "--shop-currency=$INSTALL_CURRENCY" --force
 
 	log::yellow "INFO: Creating user $INSTALL_ADMIN_USERNAME"
-	pc user:create "$INSTALL_ADMIN_USERNAME" --admin --password="$INSTALL_ADMIN_PASSWORD" -n
+	pc -n user:create "$INSTALL_ADMIN_USERNAME" --admin --password="$INSTALL_ADMIN_PASSWORD"
 
 	log::yellow "INFO: Creating $SALES_CHANNEL_NAME sales channel using theme with URL: $SALES_CHANNEL_URL"
-	pc sales-channel:create:storefront --name="$SALES_CHANNEL_NAME" --url="$SALES_CHANNEL_URL"
+	pc -n sales-channel:create:storefront --name="$SALES_CHANNEL_NAME" --url="$SALES_CHANNEL_URL"
 
   sales_channel_map=$(pc sales-channel:list --output json | jq -r '[.[] | {(.name|tostring): .id }] | add')
   sales_channel_id=$(echo "$sales_channel_map" | jq -r ".$SALES_CHANNEL_NAME")
   log::yellow "INFO: Configuring new sales channel $SALES_CHANNEL_THEME to use theme: $SALES_CHANNEL_THEME"
-	pc theme:change -s "$sales_channel_id" "$SALES_CHANNEL_THEME"
+	pc -n theme:change -s "$sales_channel_id" "$SALES_CHANNEL_THEME"
 
 	log::yellow "INFO: Setting installation completion date to: $completed_at"
-	pc system:config:set core.frw.completedAt "$completed_at"
+	pc -n system:config:set core.frw.completedAt "$completed_at"
 
 	log::yellow "INFO: Refreshing Shopware plugins"
-	pc plugin:refresh
+	pc -n plugin:refresh
 
   log::yellow "INFO: Installing all Shopware plugins"
   shopware_install_plugins
+
+  log::yellow "INFO: Creating ElasticSearch index"
+  pc -n es:index
 
   log::yellow "INFO: Restoring configuration and clearing Shopware cache for environment $APP_ENV"
   move_storefront_config

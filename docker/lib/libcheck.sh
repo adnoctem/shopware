@@ -38,8 +38,8 @@ database_connection_check() {
 	echo "|--------------------------------------------------------------|"
 
 	# shellcheck disable=SC2086
-	database_host=${DATABASE_HOST:-"$(trurl "$DATABASE_URL" --get '{host}')"}
-	database_port=${DATABASE_PORT:-"$(trurl "$DATABASE_URL" --get '{port}')"}
+	database_host=$(trurl "$DATABASE_URL" --get '{host}')
+	database_port=$(trurl "$DATABASE_URL" --get '{port}')
 	tries=0
 
   until nc -z -w"${CONNECTION_TIMEOUT}" -v "${database_host}" "${database_port:-3306}" 2>/dev/null; do
@@ -77,8 +77,8 @@ opensearch_connection_check() {
 	echo "|--------------------------------------------------------------|"
 
 	# shellcheck disable=SC2086
-	es_host=${OPENSEARCH_HOST:-"$(trurl "$OPENSEARCH_URL" --get '{host}')"}
-	es_port=${OPENSEARCH_PORT:-"$(trurl "$OPENSEARCH_URL" --get '{port}')"}
+	es_host=$(trurl "$OPENSEARCH_URL" --get '{host}')
+	es_port=$(trurl "$OPENSEARCH_URL" --get '{port}')
 	tries=0
 
   until nc -z -w"${CONNECTION_TIMEOUT}" -v "${es_host}" "${es_port:-9200}" 2>/dev/null; do
@@ -113,8 +113,8 @@ redis_connection_check() {
 	echo "|--------------------------------------------------------------|"
 
 	# shellcheck disable=SC2086
-	redis_host=${REDIS_HOST:-"$(trurl "$REDIS_URL" --get '{host}')"}
-	redis_port=${REDIS_PORT:-"$(trurl "$REDIS_URL" --get '{port}')"}
+	redis_host=$(trurl "$REDIS_URL" --get '{host}')
+	redis_port=$(trurl "$REDIS_URL" --get '{port}')
 	tries=0
 
   until nc -z -w"${CONNECTION_TIMEOUT}" -v "${redis_host}" "${redis_port:-6379}" 2>/dev/null; do
@@ -149,8 +149,8 @@ rabbitmq_connection_check() {
 	echo "|--------------------------------------------------------------|"
 
 	# shellcheck disable=SC2086
-	rabbitmq_host=${RABBITMQ_HOST:-"$(trurl "$MESSENGER_TRANSPORT_DSN" --get '{host}')"}
-	rabbitmq_port=${RABBITMQ_PORT:-"$(trurl "$MESSENGER_TRANSPORT_DSN" --get '{port}')"}
+	rabbitmq_host=$(trurl "$MESSENGER_TRANSPORT_DSN" --get '{host}')
+	rabbitmq_port=$(trurl "$MESSENGER_TRANSPORT_DSN" --get '{port}')
 	tries=0
 
   until nc -z -w"${CONNECTION_TIMEOUT}" -v "${rabbitmq_host}" "${rabbitmq_port:-5672}" 2>/dev/null; do

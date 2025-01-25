@@ -1,0 +1,5 @@
+# configure Shopware to send e-mails via the message queue
+# ref: https://developer.shopware.com/docs/guides/hosting/performance/performance-tweaks.html#sending-mails-with-the-queue
+framework:
+  mailer:
+    message_bus: 'messenger.default_bus'

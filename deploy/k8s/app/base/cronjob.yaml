@@ -1,0 +1,128 @@
+# ref: https://developer.shopware.com/docs/guides/hosting/infrastructure/scheduled-task.html#running-scheduled-tasks
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shopware-scheduled-tasks
+  namespace: shopware
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: shopware-cron-worker
+              image: adnoctem/shopware:0.0.1
+              imagePullPolicy: IfNotPresent
+              args: [ "bin/console", "scheduled-task:run", "--no-wait" ]
+              envFrom:
+                - configMapRef:
+                    name: shopware-config
+              env:
+                # Admin credentials
+                - name: INSTALL_ADMIN_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-admin-credentials
+                      key: username
+                - name: INSTALL_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-admin-credentials
+                      key: password
+                # MySQL credentials
+                - name: DATABASE_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-mysql-credentials
+                      key: username
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-mysql-credentials
+                      key: password
+                # Redis credentials
+                # - name: REDIS_USER
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: shopware-redis-credentials
+                #       key: username
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-redis-credentials
+                      key: password
+                # OpenSearch credentials
+                - name: OPENSEARCH_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-opensearch-credentials
+                      key: username
+                - name: OPENSEARCH_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-opensearch-credentials
+                      key: password
+                # RabbitMQ credentials
+                - name: MESSENGER_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-rabbitmq-credentials
+                      key: username
+                - name: MESSENGER_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-rabbitmq-credentials
+                      key: password
+                # S3 credentials
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-s3-credentials
+                      key: access_key
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-s3-credentials
+                      key: secret_key
+                - name: S3_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-s3-credentials
+                      key: endpoint
+                # Mailer credentials
+                # - name: MAILER_USER
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: shopware-smtp-credentials
+                #       key: username
+                # - name: MAILER_PASSWORD
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: shopware-smtp-credentials
+                #       key: password
+                # Application secrets
+                - name: INSTANCE_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-app-secrets
+                      key: instance_id
+                - name: APP_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: shopware-app-secrets
+                      key: app_secret
+              livenessProbe:
+                exec:
+                  command: [ "php", "-m" ]
+              readinessProbe:
+                exec:
+                  command: [ "php", "-r", "phpinfo();" ]
+              volumeMounts:
+                - mountPath: /var/www/html
+                  name: shopware-docroot
+          volumes:
+            - name: shopware-docroot
+              persistentVolumeClaim:
+                claimName: shopware-docroot
