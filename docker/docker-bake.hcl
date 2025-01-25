@@ -81,16 +81,14 @@ function "get_node_version" {
 function "base_tags" {
   params = []
   result = flatten(
-    concat([
-      "${REPO}:latest",
-      "${REPO}:${VERSION}"
-    ],
-      [
-        for reg in get_registry() : [
-        "${reg}/${REPO}:latest",
-        "${reg}/${REPO}:${VERSION}"
-      ]
-      ])
+    concat(["${REPO}:${VERSION}"], [for reg in get_registry() : ["${reg}/${REPO}:${VERSION}"]])
+  )
+}
+
+function "latest_tags" {
+  params = []
+  result = flatten(
+    concat(["${REPO}:latest"], [for reg in get_registry() : ["${reg}/${REPO}:latest"]])
   )
 }
 
@@ -111,6 +109,16 @@ function "app_tags" {
   ])
 }
 
+
+function "tags" {
+  params = [
+    suffix,
+    php,
+    node
+  ]
+  result = php == "${PHP}" ? concat(app_tags(suffix, php, node), latest_tags()) : app_tags(suffix, php, node)
+}
+
 # Build the image tags for external applications for the repository 'adnoctem/shopware'
 # NOTE: do not create tags like `latest-nginx`
 function "external_tags" {
@@ -118,9 +126,7 @@ function "external_tags" {
     suffix
   ]
   result = flatten([
-    for tag in setsubtract(
-      base_tags(), ["${REPO}:latest", "ghcr.io/${REPO}:latest"]
-    ) : [
+    for tag in base_tags() : [
       "${tag}${suffix}"
     ]
   ])
@@ -200,7 +206,8 @@ target "shopware" {
     APP_ENV      = "prod"
     BUILD_CMD    = "shopware-cli project ci ."
   }
-  tags = app_tags(
+  # only set latest for the main image
+  tags = tags(
     "",
     "${php}",
     "${node}"
@@ -224,7 +231,7 @@ target "shopware-dev" {
     APP_ENV      = "dev"
     BUILD_CMD    = "shopware-cli project ci --with-dev-dependencies ."
   }
-  tags = app_tags(
+  tags = tags(
     "-dev",
     "${php}",
     "${node}"
