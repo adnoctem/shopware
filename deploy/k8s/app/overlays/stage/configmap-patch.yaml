@@ -3,13 +3,6 @@ kind: ConfigMap
 metadata:
   name: shopware-config
   namespace: shopware
-  labels:
-    app.kubernetes.io/component: shop
-    app.kubernetes.io/instance: shopware
-    app.kubernetes.io/managed-by: Kustomize
-    app.kubernetes.io/name: shopware
-    app.kubernetes.io/part-of: shopware
-    app.kubernetes.io/version: 0.0.1
 data:
   # General settings
   APP_ENV: "prod"
@@ -31,7 +24,6 @@ data:
   MESSENGER_HOST: "shopware-rabbitmq.shopware.svc.cluster.local"
   MESSENGER_PORT: "5672"
   MESSENGER_PATH: "/%2f/async"
-  # MESSENGER_QUERY_PARAMS: "?auto_setup=false"
   MESSENGER_LOW_PRIORITY_PATH: "/%2f/low_priority"
   MESSENGER_FAILURE_PATH: "/%2f/failed"
   # S3
@@ -51,7 +43,7 @@ data:
   # HTTP caching settings
   SHOPWARE_HTTP_CACHE_ENABLED: "0"
   SHOPWARE_HTTP_DEFAULT_TTL: "7200"
-  STOREFRONT_PROXY_URL: "https://shopware.internal"
+  STOREFRONT_PROXY_URL: "https://shop.delta4x4.dev"
   # ElasticSearch/OpenSearch settings
   SHOPWARE_ES_ENABLED: "1"
   SHOPWARE_ES_INDEXING_ENABLED: "1"
@@ -71,5 +63,5 @@ data:
   INSTALL_LOCALE: "de-DE"
   INSTALL_CURRENCY: "EUR"
   SALES_CHANNEL_NAME: "Storefront"
-  SALES_CHANNEL_URL: "https://shopware.internal"
+  SALES_CHANNEL_URL: "https://shop.delta4x4.dev"
   SALES_CHANNEL_THEME: "Storefront"

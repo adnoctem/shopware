@@ -10,10 +10,12 @@ spec:
     spec:
       template:
         spec:
+          imagePullSecrets:
+            - name: shopware-cr-credentials
           restartPolicy: OnFailure
           containers:
             - name: shopware-cron-worker
-              image: adnoctem/shopware:0.0.1
+              image: delta4x4/shopware:0.0.1
               imagePullPolicy: IfNotPresent
               args: [ "bin/console", "scheduled-task:run", "--no-wait" ]
               envFrom:

@@ -1,10 +1,16 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: shopware
-  namespace: shopware
+  name: redacted
+  namespace: redacted
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-placeholder-issuer
+    cert-manager.io/cluster-issuer: zerossl-staging-issuer
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "147.78.126.74/32,87.186.41.33/32"
   labels:
     app.kubernetes.io/component: shop
     app.kubernetes.io/instance: shopware
@@ -15,7 +21,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: "shopware.internal"
+    - host: shop.delta4x4.dev
       http:
         paths:
           - path: /

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "efda17917b961423a989bab9d561ff37",
+    "content-hash": "a38a234179c7b679b6556d9d99cfe8fe",
     "packages": [
         {
             "name": "async-aws/core",
@@ -6341,6 +6341,239 @@
                 "source": "https://github.com/squirrelphp/twig-php-syntax/tree/v1.8"
             },
             "time": "2024-05-01T12:16:25+00:00"
+        },
+        {
+            "name": "store.shopware.com/molliepayments",
+            "version": "4.13.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.shopware.com/download?downloadUrl=%2Fpackages%2Fplugins%2FMolliePayments%2Fbinaries%2F4.13.0"
+            },
+            "require": {
+                "ext-curl": "*",
+                "php": ">=7.4",
+                "shopware/administration": "6.4.1.0 - 6.7.0.0",
+                "shopware/core": "6.4.1.0 - 6.7.0.0",
+                "shopware/elasticsearch": "6.4.1.0 - 6.7.0.0",
+                "shopware/storefront": "6.4.1.0 - 6.7.0.0"
+            },
+            "replace": {
+                "kiener/mollie-payments-plugin": "self.version"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "label": {
+                    "de-DE": "Mollie Zahlungen",
+                    "en-GB": "Mollie Payments",
+                    "nl-NL": "Mollie Betalingen"
+                },
+                "copyright": "(c) by Mollie B.V.",
+                "description": {
+                    "de-DE": "Mit Mollie integrieren Sie alle wichtigen internationalen und lokalen Zahlungsmethoden in nur einem Schritt in Ihren Shopware-Webshop. Starten Sie noch heute!",
+                    "en-GB": "With Mollie you integrate every major global and local payment method in your Shopware webshop in one go. Start growing your business with effortless payments today!",
+                    "nl-NL": "Met Mollie integreer je alle belangrijke internationale en lokale betaalmethoden in één keer in je Shopware webshop. Start vandaag nog!"
+                },
+                "supportLink": {
+                    "de-DE": "https://www.mollie.com/contact",
+                    "en-GB": "https://www.mollie.com/contact",
+                    "nl-NL": "https://www.mollie.com/contact"
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://store.shopware.com/mollie.html",
+                    "en-GB": "https://store.shopware.com/mollie.html",
+                    "nl-NL": "https://store.shopware.com/mollie.html"
+                },
+                "shopware-plugin-class": "Kiener\\MolliePayments\\MolliePayments"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Mollie\\Api\\": "vendor_manual/mollie/mollie-api-php/src/",
+                    "Kiener\\MolliePayments\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "MolliePayments\\Tests\\": "tests/PHPUnit/",
+                    "MolliePayments\\PHPStan\\": "tests/PHPStan/",
+                    "MolliePayments\\Fixtures\\": "tests/Fixtures/"
+                }
+            },
+            "notification-url": "https://packages.shopware.com/downloads/",
+            "authors": [
+                {
+                    "name": "Mollie B.V."
+                }
+            ],
+            "description": "Mollie Payments"
+        },
+        {
+            "name": "store.shopware.com/newslettersendinblue",
+            "version": "4.1.10",
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.shopware.com/download?downloadUrl=%2Fpackages%2Fplugins%2FNewsletterSendinblue%2Fbinaries%2F4.1.10"
+            },
+            "require": {
+                "shopware/core": ">=6.5.0.0"
+            },
+            "replace": {
+                "sendinblue/plugin-shopware-6": "self.version"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "label": {
+                    "de-DE": "Brevo: E-Mail & Online Marketing Plattform",
+                    "en-GB": "Brevo: eMail & Online Marketing Platform"
+                },
+                "copyright": "(c) by Sendinblue GmbH",
+                "description": {
+                    "de-DE": "Brevo ist eine Plattform für digitales Marketing. Versenden Sie Newsletter, SMS und kombinieren Sie diese mit Automation Workflows die Sie erstellt haben.",
+                    "en-GB": "Brevo is a marketing platform that allows you to send newsletters, SMS, and transactional emails as well as using marketing automation. Start free trial now."
+                },
+                "plugin-icon": "src/Resources/public/static/img/plugin.png",
+                "supportLink": {
+                    "de-DE": "https://help.brevo.com/hc/de",
+                    "en-GB": "https://help.brevo.com/hc/en-us",
+                    "fr-FR": "https://help.brevo.com/hc/fr"
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://www.brevo.com/de/",
+                    "en-GB": "https://www.brevo.com/",
+                    "fr-FR": "https://www.brevo.com/fr/"
+                },
+                "shopware-plugin-class": "NewsletterSendinblue\\NewsletterSendinblue"
+            },
+            "autoload": {
+                "psr-4": {
+                    "NewsletterSendinblue\\": "src/"
+                }
+            },
+            "notification-url": "https://packages.shopware.com/downloads/",
+            "authors": [
+                {
+                    "name": "Sendinblue GmbH"
+                }
+            ],
+            "description": "Brevo plugin"
+        },
+        {
+            "name": "store.shopware.com/swaganalytics",
+            "version": "2.5.4",
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.shopware.com/download?downloadUrl=%2Fpackages%2Fplugins%2FSwagAnalytics%2Fbinaries%2F2.5.4"
+            },
+            "type": "shopware-app",
+            "notification-url": "https://packages.shopware.com/downloads/",
+            "authors": [
+                {
+                    "name": "shopware AG"
+                }
+            ]
+        },
+        {
+            "name": "store.shopware.com/swagmigrationassistant",
+            "version": "14.0.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.shopware.com/download?downloadUrl=%2Fpackages%2Fplugins%2FSwagMigrationAssistant%2Fbinaries%2F14.0.0"
+            },
+            "require": {
+                "shopware/core": "~6.6.1"
+            },
+            "replace": {
+                "swag/migration-assistant": "self.version"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "label": {
+                    "de-DE": "Migrations-Assistent",
+                    "en-GB": "Migration Assistant"
+                },
+                "copyright": "(c) by shopware AG",
+                "description": {
+                    "de-DE": "Der Migrations-Assistent stellt eine Verbindung von einer Datenquelle (z.B Shopware 5) zu Shopware 6 her und begleitet Dich Schritt für Schritt beim Migrationsprozess.",
+                    "en-GB": "The Migration Assistant establishes a connection between a data source (e.g. Shopware 5) and Shopware 6 and guides you step by step through the migration process."
+                },
+                "plugin-icon": "src/Resources/config/plugin.png",
+                "supportLink": {
+                    "de-DE": "https://issues.shopware.com/",
+                    "en-GB": "https://issues.shopware.com/"
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://store.shopware.com/shopware-ag.html",
+                    "en-GB": "https://store.shopware.com/en/shopware-ag.html"
+                },
+                "shopware-plugin-class": "SwagMigrationAssistant\\SwagMigrationAssistant"
+            },
+            "autoload": {
+                "psr-4": {
+                    "SwagMigrationAssistant\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "SwagMigrationAssistant\\Test\\": "tests/"
+                }
+            },
+            "notification-url": "https://packages.shopware.com/downloads/",
+            "authors": [
+                {
+                    "name": "Shopware"
+                }
+            ],
+            "description": "Migration plugin for shopware/platform"
+        },
+        {
+            "name": "store.shopware.com/zenitplatformatmos",
+            "version": "4.8.1",
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.shopware.com/download?downloadUrl=%2Fpackages%2Fplugins%2FzenitPlatformAtmos%2Fbinaries%2F4.8.1"
+            },
+            "require": {
+                "shopware/core": "^6.6.1",
+                "shopware/storefront": "^6.6.1"
+            },
+            "replace": {
+                "zenit/atmos": "self.version"
+            },
+            "type": "shopware-platform-plugin",
+            "extra": {
+                "label": {
+                    "de-DE": "Theme ATMOS | Pro",
+                    "en-GB": "Theme ATMOS | Pro"
+                },
+                "copyright": "(c) by Zenit Design",
+                "description": {
+                    "de-DE": "Theme Atmos - Responsive Shopware 6 Theme. Ein Theme - grenzenlose Möglichkeiten! Theme Atmos ist Dein Shopware Theme, welches Du dank seiner vielseitigen Individualisierungsmöglichkeiten komplett selbst gestalten kannst. Zur gestaltung bietet es eine umfassende Themekonfiguration mit zahlreichen Konfigurationsmöglichkeiten. Das klare Design überzeugt mit sauberer eleganter Designsprache und rückt so das Wichtige in den Vordergrund - Deine Produkte.",
+                    "en-GB": "Theme Atmos - Responsive Shopware 6 Theme. One theme - limitless possibilities! Theme Atmos is your Shopware theme, which you can design completely yourself thanks to its versatile theme configuration. For individualization, it offers a comprehensive topic configuration with countless configuration options. The clear design impresses with its clean and elegant design language and thus puts the important thing in the foreground - your products."
+                },
+                "plugin-icon": "src/Resources/config/plugin.png",
+                "supportLink": {
+                    "de-DE": "https://help.zenit.design",
+                    "en-GB": "https://help.zenit.design"
+                },
+                "manufacturerLink": {
+                    "de-DE": "https://store.shopware.com/zenit-design.html",
+                    "en-GB": "https://store.shopware.com/en/zenit-design.html"
+                },
+                "shopware-plugin-class": "zenit\\PlatformAtmos\\zenitPlatformAtmos"
+            },
+            "autoload": {
+                "psr-4": {
+                    "zenit\\PlatformAtmos\\": "src/"
+                }
+            },
+            "notification-url": "https://packages.shopware.com/downloads/",
+            "authors": [
+                {
+                    "name": "Zenit Design",
+                    "role": "Manufacturer",
+                    "homepage": "https://zenit.design"
+                }
+            ],
+            "description": "Theme Atmos by Zenit Design"
         },
         {
             "name": "swag/language-pack",
@@ -14929,12 +15162,12 @@
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.2 <8.4",
-        "ext-redis": "*",
+        "ext-amqp": "*",
         "ext-apcu": "*",
         "ext-grpc": "*",
         "ext-opentelemetry": "*",
+        "ext-redis": "*",
         "ext-zstd": "*",
-        "ext-amqp": "*",
         "composer-runtime-api": "^2.0"
     },
     "platform-dev": {},

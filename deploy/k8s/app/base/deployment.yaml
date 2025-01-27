@@ -27,6 +27,8 @@ spec:
         app.kubernetes.io/part-of: shopware
         app.kubernetes.io/version: 0.0.1
     spec:
+      imagePullSecrets:
+        - name: shopware-regcred
       serviceAccountName: shopware
       terminationGracePeriodSeconds: 400
       securityContext:
@@ -37,7 +39,7 @@ spec:
       initContainers:
         # Kubernetes Volume initialization
         - name: shopware-init-volume
-          image: adnoctem/shopware:0.0.1
+          image: delta4x4/shopware:0.0.1
           imagePullPolicy: IfNotPresent
           command: [ "/bin/bash" ]
           args: [ "-c","cp -a /var/www/html/. /tmp/docroot; chown -R 1001:1001 /tmp/docroot" ]
@@ -50,7 +52,7 @@ spec:
             runAsNonRoot: false
         # Setup (init) Container
         - name: shopware-setup
-          image: adnoctem/shopware:0.0.1
+          image: delta4x4/shopware:0.0.1
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
@@ -153,7 +155,7 @@ spec:
         # Sidecars
         # Message Worker 1
         - name: shopware-message-worker-1
-          image: adnoctem/shopware:0.0.1
+          image: delta4x4/shopware:0.0.1
           imagePullPolicy: IfNotPresent
           restartPolicy: Always
           args: [ "bin/console", "messenger:consume", "--time-limit=360", "--memory-limit=512M", "async", "low_priority" ]
@@ -260,7 +262,7 @@ spec:
               name: shopware-docroot
         # Message Worker 2
         - name: shopware-message-worker-2
-          image: adnoctem/shopware:0.0.1
+          image: delta4x4/shopware:0.0.1
           imagePullPolicy: IfNotPresent
           restartPolicy: Always
           args: [ "bin/console", "messenger:consume", "--time-limit=360", "--memory-limit=512M", "async", "low_priority" ]
@@ -367,7 +369,7 @@ spec:
               name: shopware-docroot
         # Message Worker 3
         - name: shopware-message-worker-3
-          image: adnoctem/shopware:0.0.1
+          image: delta4x4/shopware:0.0.1
           imagePullPolicy: IfNotPresent
           restartPolicy: Always
           args: [ "bin/console", "messenger:consume", "--time-limit=360", "--memory-limit=512M", "async", "low_priority" ]
@@ -474,7 +476,7 @@ spec:
               name: shopware-docroot
       containers:
         - name: nginx
-          image: adnoctem/shopware:0.0.1-nginx
+          image: delta4x4/shopware:0.0.1-nginx
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

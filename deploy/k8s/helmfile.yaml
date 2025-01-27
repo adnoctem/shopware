@@ -149,23 +149,6 @@ releases:
     values:
       - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/opentelemetry-operator.yaml
 
-  # ref: https://artifacthub.io/packages/helm/elastic/eck-operator
-  - chart: elastic/eck-operator
-    name: eck-operator
-    namespace: eck-operator
-    version: 2.15.0
-    installed: false
-    disableValidationOnInstall: true
-    labels:
-      app: eck-operator
-      release: eck-operator
-      group: operators
-    needs:
-      - cert-manager/cert-manager
-      - kube-prometheus-stack/kube-prometheus-stack
-    values:
-      - {{ $envDir }}/{{`{{ .Environment.Name }}`}}/eck-operator.yaml
-
   # ref: https://github.com/opensearch-project/opensearch-k8s-operator/tree/main/charts/opensearch-operator
   - chart: opensearch-operator/opensearch-operator
     name: opensearch-operator

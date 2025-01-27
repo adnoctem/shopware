@@ -4,6 +4,6 @@ kind: Kustomization
 resources:
   # CRDs
   - opensearch.yaml
-  - percona-mysql.yaml
+  - percona-cluster.yaml
   - otel-collector.yaml
   - rabbitmq-cluster.yaml

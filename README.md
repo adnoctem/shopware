@@ -6,10 +6,9 @@ Feel free to check out the [official Shopware repository][shopware_repository] f
 directly to their [homepage][shopware] for more information about the **Shopware AG &reg;** and their offerings.
 
 > [!CAUTION]
-> This repository is the basis for an exceptionally heavily customized and advanced Shopware 6 instance and therefore
-> requires deep knowledge about the inner workings of the Shopware. Feel free to use our source as guidance nonetheless.
-> It's [MIT-licensed][license].
-
+> This repository contains the source for the [proprietary][license] delta4x4 build of Shopware 6. Any unauthorized copying, 
+> modification or distribution of these sources is an infringement of our Copyright and will be persecuted as such.
+> 
 ## ✨ TL;DR
 
 ```shell
@@ -28,17 +27,11 @@ make env
 Refer to our [documentation for contributors][contributing] for contributing guidelines, commit message
 formats and versioning tips.
 
-### 📥 Maintainers
-
-This project is owned and maintained by [FMJ Studios][fmjstudios] refer to
-the [`AUTHORS`][authors] or [`CODEOWNERS`][codeowners] for more information. You may also use the linked
-contact details to reach out directly.
-
 ---
 
 ### 📜 License
 
-**[MIT][license]**
+**[Proprietary][license]**
 
 ### ©️ Copyright
 

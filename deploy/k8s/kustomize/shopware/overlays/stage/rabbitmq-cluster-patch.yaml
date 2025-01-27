@@ -1,0 +1,26 @@
+# ref: https://github.com/rabbitmq/cluster-operator/blob/main/docs/examples/production-ready/rabbitmq.yaml
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: redacted
+  namespace: redacted
+spec:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2500m
+      memory: 6Gi
+  rabbitmq:
+    additionalConfig: |
+      cluster_partition_handling = pause_minority
+      disk_free_limit.relative = 1.0
+      collect_statistics_interval = 10000
+  persistence:
+    storageClassName: linode-block-storage-retain
+    storage: 10Gi
+  secretBackend:
+    externalSecret:
+      name: shopware-rabbitmq-credentials

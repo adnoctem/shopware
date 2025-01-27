@@ -2,6 +2,7 @@ sources:
   - ingress
 provider: cloudflare
 cloudflare:
+  # the name of a secret containing a `cloudflare_api_token` or `cloudflare_api_key` key
   secretName: cloudflare-api-credentials
   email: maximilian.gindorfer@delta4x4.com
   proxied: false

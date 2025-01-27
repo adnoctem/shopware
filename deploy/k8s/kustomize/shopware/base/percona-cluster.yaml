@@ -3,6 +3,8 @@ kind: PerconaXtraDBCluster
 metadata:
   name: shopware-mysql
   namespace: shopware
+  labels:
+    fmj.dev/component: shopware-mysql
 spec:
   crVersion: 1.16.0
   secretsName: shopware-pxc-credentials

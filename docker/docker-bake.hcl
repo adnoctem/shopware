@@ -17,7 +17,7 @@ variable "REGISTRIES" {
 
 # lock the image repository
 variable "REPO" {
-  default = "adnoctem/shopware"
+  default = "delta4x4/shopware"
 }
 
 # set a default version
@@ -52,16 +52,16 @@ function "get_registry" {
 function "labels" {
   params = []
   result = {
-    "org.opencontainers.image.base.name"     = "adnoctem/shopware:latest"
+    "org.opencontainers.image.base.name"     = "delta4x4/shopware:latest"
     "org.opencontainers.image.created"       = "${timestamp()}"
-    "org.opencontainers.image.description"   = "Shopware - packaged by Ad Noctem Collective"
-    "org.opencontainers.image.documentation" = "https://github.com/adnoctem/shopware"
+    "org.opencontainers.image.description"   = "Shopware - proprietary build by delta4x4"
+    "org.opencontainers.image.documentation" = "https://github.com/delta4x4/shopware"
     "org.opencontainers.image.licenses"      = "MIT"
-    "org.opencontainers.image.url"           = "https://hub.docker.com/r/adnoctem/shopware"
-    "org.opencontainers.image.source"        = "https://github.com/adnoctem/shopware"
+    "org.opencontainers.image.url"           = "https://hub.docker.com/r/delta4x4/shopware"
+    "org.opencontainers.image.source"        = "https://github.com/delta4x4/shopware"
     "org.opencontainers.image.title"         = "shopware"
-    "org.opencontainers.image.vendor"        = "Ad Noctem Collective"
-    "org.opencontainers.image.authors"       = "info@adnoctem.co"
+    "org.opencontainers.image.vendor"        = "delta4x4"
+    "org.opencontainers.image.authors"       = "admin@delta4x4.net"
     "org.opencontainers.image.version"       = VERSION
   }
 }
@@ -119,7 +119,7 @@ function "tags" {
   result = php == "${PHP}" ? concat(app_tags(suffix, php, node), latest_tags()) : app_tags(suffix, php, node)
 }
 
-# Build the image tags for external applications for the repository 'adnoctem/shopware'
+# Build the image tags for external applications for the repository 'delta4x4/shopware'
 # NOTE: do not create tags like `latest-nginx`
 function "external_tags" {
   params = [
@@ -183,10 +183,6 @@ group "dev" {
   targets = ["shopware-dev"]
 }
 
-# group "aio" {
-#   targets = ["shopware-aio"]
-# }
-
 group "all" {
   targets = ["shopware", "shopware-dev", "nginx"]
 }
@@ -240,20 +236,6 @@ target "shopware-dev" {
     "type=file,id=composer_auth,src=auth.json"
   ]
 }
-
-# The AIO (all-in-one) application image
-# target "shopware-aio" {
-#   name       = "shopware-aio-${tgt}"
-#   dockerfile = "docker/aio.Dockerfile"
-#   inherits = ["base"]
-#   matrix = {
-#     tgt = get_target()
-#   }
-#   contexts = {
-#     base = "docker-image://adnoctem/shopware:${VERSION}"
-#   }
-#   tags = external_tags("-aio")
-# }
 
 # A custom Shopware-focused Nginx image
 target "nginx" {

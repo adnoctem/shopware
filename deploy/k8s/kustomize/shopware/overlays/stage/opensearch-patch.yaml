@@ -1,0 +1,56 @@
+# ref: https://github.com/opensearch-project/opensearch-k8s-operator/blob/main/docs/userguide/main.md
+apiVersion: opensearch.opster.io/v1
+kind: OpenSearchCluster
+metadata:
+  name: redacted
+  namespace: redacted
+spec:
+  nodePools:
+    - component: masters
+      pdb:
+        enable: true
+        minAvailable: 1
+      replicas: 3
+      diskSize: 2Gi
+      nodeSelector:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 2Gi
+          cpu: 1000m
+      roles:
+        - cluster_manager
+        - data
+    - component: nodes
+      replicas: 3
+      diskSize: 10Gi
+      nodeSelector:
+      resources:
+        requests:
+          memory: 2Gi
+          cpu: 1000m
+        limits:
+          memory: 4Gi
+          cpu: 1500m
+      roles:
+        - data
+      persistence:
+        pvc:
+          storageClass: linode-block-storage-retain
+          accessModes:
+            - ReadWriteOnce
+    - component: coordinators
+      replicas: 3
+      diskSize: 2Gi
+      nodeSelector:
+      resources:
+        requests:
+          memory: 2Gi
+          cpu: 1000m
+        limits:
+          memory: 4Gi
+          cpu: 1500m
+      roles:
+        - ingest

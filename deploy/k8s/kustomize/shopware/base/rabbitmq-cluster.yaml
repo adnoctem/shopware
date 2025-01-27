@@ -4,6 +4,8 @@ kind: RabbitmqCluster
 metadata:
   name: shopware-rabbitmq
   namespace: shopware
+  labels:
+    fmj.dev/component: shopware-rabbitmq
 spec:
   replicas: 3
   resources:

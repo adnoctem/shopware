@@ -50,9 +50,6 @@ repositories:
   - name: jaegertracing
     url: https://jaegertracing.github.io/helm-charts
 
-  - name: elastic
-    url: https://helm.elastic.co
-
   - name: opentelemetry
     url: https://open-telemetry.github.io/opentelemetry-helm-charts
 

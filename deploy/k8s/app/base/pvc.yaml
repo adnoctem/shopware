@@ -3,6 +3,13 @@ kind: PersistentVolumeClaim
 metadata:
   name: shopware-docroot
   namespace: shopware
+  labels:
+    app.kubernetes.io/component: shop
+    app.kubernetes.io/instance: shopware
+    app.kubernetes.io/managed-by: Kustomize
+    app.kubernetes.io/name: shopware
+    app.kubernetes.io/part-of: shopware
+    app.kubernetes.io/version: 0.0.1
 spec:
   storageClassName: standard
   accessModes:
